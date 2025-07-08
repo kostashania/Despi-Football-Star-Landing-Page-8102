@@ -11,7 +11,7 @@ import { validateImageUrl } from '../utils/imageUpload';
 const { 
   FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, 
   FiSettings, FiImage, FiArrowUp, FiArrowDown, FiUpload, FiExternalLink, FiLink,
-  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar
+  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar, FiCalendar, FiShare2
 } = FiIcons;
 
 const AdminPage = () => {
@@ -27,11 +27,15 @@ const AdminPage = () => {
   const [messages, setMessages] = useState([]);
   const [galleryImages, setGalleryImages] = useState([]);
   const [pendingImages, setPendingImages] = useState([]);
+  const [bioTimeline, setBioTimeline] = useState([]);
   const [settings, setSettings] = useState({
     recaptcha_enabled: false,
     recaptcha_site_key: '',
     recaptcha_secret_key: '',
-    notification_emails: 'despihania@gmail.com'
+    notification_emails: 'despihania@gmail.com',
+    social_youtube_url: 'https://www.youtube.com/@despi5740',
+    social_instagram_url: 'https://instagram.com/despi_football',
+    social_facebook_url: 'https://facebook.com/despi.football'
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
@@ -48,10 +52,16 @@ const AdminPage = () => {
     image_url: '',
     is_featured: false
   });
+  const [currentBioItem, setCurrentBioItem] = useState({
+    year: new Date().getFullYear(),
+    description: '',
+    sort_order: 0
+  });
 
   const tabs = [
     { id: 'pending', label: 'Pending Images', icon: FiClock },
     { id: 'hero', label: 'Hero Section', icon: FiEdit },
+    { id: 'bio', label: 'Short Bio', icon: FiCalendar },
     { id: 'gallery', label: 'Gallery', icon: FiImage },
     { id: 'videos', label: 'Videos', icon: FiYoutube },
     { id: 'messages', label: 'Messages', icon: FiMessageSquare },
@@ -98,6 +108,14 @@ const AdminPage = () => {
 
         if (error && error.code !== 'PGRST116') throw error;
         if (data) setHeroContent(data);
+      } else if (activeTab === 'bio') {
+        const { data, error } = await supabase
+          .from('bio_timeline_despi_9a7b3c4d2e')
+          .select('*')
+          .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        setBioTimeline(data || []);
       } else if (activeTab === 'gallery') {
         const { data, error } = await supabase
           .from('gallery_images_despi_9a7b3c4d2e')
@@ -144,7 +162,10 @@ const AdminPage = () => {
           recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
           recaptcha_site_key: settingsObj.recaptcha_site_key || '',
           recaptcha_secret_key: settingsObj.recaptcha_secret_key || '',
-          notification_emails: settingsObj.notification_emails || 'despihania@gmail.com'
+          notification_emails: settingsObj.notification_emails || 'despihania@gmail.com',
+          social_youtube_url: settingsObj.social_youtube_url || 'https://www.youtube.com/@despi5740',
+          social_instagram_url: settingsObj.social_instagram_url || 'https://instagram.com/despi_football',
+          social_facebook_url: settingsObj.social_facebook_url || 'https://facebook.com/despi.football'
         });
       }
     } catch (error) {
@@ -200,7 +221,10 @@ const AdminPage = () => {
         { setting_key: 'recaptcha_enabled', setting_value: settings.recaptcha_enabled.toString() },
         { setting_key: 'recaptcha_site_key', setting_value: settings.recaptcha_site_key },
         { setting_key: 'recaptcha_secret_key', setting_value: settings.recaptcha_secret_key },
-        { setting_key: 'notification_emails', setting_value: settings.notification_emails }
+        { setting_key: 'notification_emails', setting_value: settings.notification_emails },
+        { setting_key: 'social_youtube_url', setting_value: settings.social_youtube_url },
+        { setting_key: 'social_instagram_url', setting_value: settings.social_instagram_url },
+        { setting_key: 'social_facebook_url', setting_value: settings.social_facebook_url }
       ];
 
       for (const setting of settingsToSave) {
@@ -356,6 +380,67 @@ const AdminPage = () => {
     }
   };
 
+  const addBioItem = async () => {
+    if (!currentBioItem.year || !currentBioItem.description) {
+      alert('Please fill in year and description');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('bio_timeline_despi_9a7b3c4d2e')
+        .insert([{
+          ...currentBioItem,
+          created_at: new Date(),
+          updated_at: new Date()
+        }]);
+
+      if (error) throw error;
+      
+      setCurrentBioItem({ year: new Date().getFullYear(), description: '', sort_order: 0 });
+      fetchData();
+      alert('Bio item added successfully!');
+    } catch (error) {
+      console.error('Error adding bio item:', error);
+      alert('Error adding bio item. Please try again.');
+    }
+  };
+
+  const deleteBioItem = async (itemId) => {
+    if (!confirm('Are you sure you want to delete this bio item?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('bio_timeline_despi_9a7b3c4d2e')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+      
+      fetchData();
+      alert('Bio item deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting bio item:', error);
+      alert('Error deleting bio item. Please try again.');
+    }
+  };
+
+  const toggleBioItemActive = async (itemId, currentActive) => {
+    try {
+      const { error } = await supabase
+        .from('bio_timeline_despi_9a7b3c4d2e')
+        .update({ is_active: !currentActive })
+        .eq('id', itemId);
+
+      if (error) throw error;
+      
+      fetchData();
+    } catch (error) {
+      console.error('Error updating bio item:', error);
+      alert('Error updating bio item. Please try again.');
+    }
+  };
+
   const renderPendingTab = () => (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold">Pending Image Approvals</h3>
@@ -419,6 +504,128 @@ const AdminPage = () => {
                       <SafeIcon icon={FiEye} className="w-4 h-4" />
                       View
                     </a>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderBioTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-semibold">Bio Timeline Management</h3>
+        <button
+          onClick={() => setIsEditing(!isEditing)}
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+        >
+          {isEditing ? 'Cancel' : 'Add Bio Item'}
+        </button>
+      </div>
+
+      {isEditing && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h4 className="text-lg font-medium mb-4">Add New Bio Item</h4>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Year</label>
+              <input
+                type="number"
+                value={currentBioItem.year}
+                onChange={(e) => setCurrentBioItem({ ...currentBioItem, year: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="2024"
+                min="1900"
+                max="2100"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={currentBioItem.description}
+                onChange={(e) => setCurrentBioItem({ ...currentBioItem, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                rows="3"
+                placeholder="Despi joins K10 of Finikas Italian Academy"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+              <input
+                type="number"
+                value={currentBioItem.sort_order}
+                onChange={(e) => setCurrentBioItem({ ...currentBioItem, sort_order: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="0"
+                min="0"
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={addBioItem}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                Add Bio Item
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <p>Loading bio timeline...</p>
+      ) : (
+        <div className="space-y-4">
+          {bioTimeline.length === 0 ? (
+            <p className="text-gray-500">No bio items yet.</p>
+          ) : (
+            bioTimeline.map((item) => (
+              <div key={item.id} className={`bg-white p-4 rounded-lg shadow ${
+                !item.is_active ? 'opacity-50' : ''
+              }`}>
+                <div className="flex justify-between items-start">
+                  <div className="flex-grow">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="bg-green-100 text-green-800 text-sm px-2 py-1 rounded-full font-medium">
+                        {item.year}
+                      </span>
+                      {!item.is_active && (
+                        <span className="bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded-full">
+                          Hidden
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-gray-700">{item.description}</p>
+                    <div className="text-xs text-gray-500 mt-2">
+                      Sort Order: {item.sort_order}
+                    </div>
+                  </div>
+                  <div className="flex-shrink-0 flex gap-2">
+                    <button
+                      onClick={() => toggleBioItemActive(item.id, item.is_active)}
+                      className={`px-3 py-1 text-xs rounded ${
+                        item.is_active 
+                          ? 'bg-yellow-100 text-yellow-800' 
+                          : 'bg-green-100 text-green-800'
+                      }`}
+                    >
+                      {item.is_active ? 'Hide' : 'Show'}
+                    </button>
+                    <button
+                      onClick={() => deleteBioItem(item.id)}
+                      className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                    >
+                      Delete
+                    </button>
                   </div>
                 </div>
               </div>
@@ -656,6 +863,50 @@ const AdminPage = () => {
       <h3 className="text-xl font-semibold">Website Settings</h3>
       
       <div className="bg-white p-6 rounded-lg shadow">
+        <h4 className="text-lg font-medium mb-4">Social Media URLs</h4>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              YouTube URL
+            </label>
+            <input
+              type="url"
+              value={settings.social_youtube_url}
+              onChange={(e) => setSettings({ ...settings, social_youtube_url: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="https://www.youtube.com/@despi5740"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Instagram URL
+            </label>
+            <input
+              type="url"
+              value={settings.social_instagram_url}
+              onChange={(e) => setSettings({ ...settings, social_instagram_url: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="https://instagram.com/despi_football"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Facebook URL
+            </label>
+            <input
+              type="url"
+              value={settings.social_facebook_url}
+              onChange={(e) => setSettings({ ...settings, social_facebook_url: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="https://facebook.com/despi.football"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
         <h4 className="text-lg font-medium mb-4">reCAPTCHA Settings</h4>
         <div className="space-y-4">
           <div className="flex items-center gap-3">
@@ -883,6 +1134,7 @@ const AdminPage = () => {
             <div className="flex-1 p-6">
               {activeTab === 'pending' && renderPendingTab()}
               {activeTab === 'hero' && renderHeroTab()}
+              {activeTab === 'bio' && renderBioTab()}
               {activeTab === 'gallery' && renderGalleryTab()}
               {activeTab === 'videos' && renderVideosTab()}
               {activeTab === 'messages' && renderMessagesTab()}

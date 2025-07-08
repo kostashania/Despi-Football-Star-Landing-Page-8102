@@ -1,17 +1,51 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
+import supabase from '../lib/supabase';
 
-const { FiHeart, FiYoutube, FiInstagram, FiTwitter } = FiIcons;
+const { FiHeart, FiYoutube, FiInstagram, FiFacebook } = FiIcons;
 
 const Footer = () => {
   const currentYear = new Date().getFullYear();
+  const [socialLinks, setSocialLinks] = useState({
+    youtube: 'https://www.youtube.com/@despi5740',
+    instagram: 'https://instagram.com/despi_football',
+    facebook: 'https://facebook.com/despi.football'
+  });
 
-  const socialLinks = [
-    { icon: FiYoutube, href: 'https://www.youtube.com/@despi5740', label: 'YouTube' },
-    { icon: FiInstagram, href: '#', label: 'Instagram' },
-    { icon: FiTwitter, href: '#', label: 'Twitter' }
+  useEffect(() => {
+    fetchSocialLinks();
+  }, []);
+
+  const fetchSocialLinks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_settings_despi_9a7b3c4d2e')
+        .select('*')
+        .in('setting_key', ['social_youtube_url', 'social_instagram_url', 'social_facebook_url']);
+
+      if (error) throw error;
+
+      const settings = {};
+      data.forEach(setting => {
+        settings[setting.setting_key] = setting.setting_value;
+      });
+
+      setSocialLinks({
+        youtube: settings.social_youtube_url || 'https://www.youtube.com/@despi5740',
+        instagram: settings.social_instagram_url || 'https://instagram.com/despi_football',
+        facebook: settings.social_facebook_url || 'https://facebook.com/despi.football'
+      });
+    } catch (error) {
+      console.error('Error fetching social links:', error);
+    }
+  };
+
+  const socialLinksArray = [
+    { icon: FiYoutube, href: socialLinks.youtube, label: 'YouTube' },
+    { icon: FiInstagram, href: socialLinks.instagram, label: 'Instagram' },
+    { icon: FiFacebook, href: socialLinks.facebook, label: 'Facebook' }
   ];
 
   const handleNavClick = (href) => {
@@ -19,7 +53,6 @@ const Footer = () => {
     if (element) {
       const headerHeight = 80;
       const elementPosition = element.offsetTop - headerHeight;
-      
       window.scrollTo({
         top: elementPosition,
         behavior: 'smooth'
@@ -47,7 +80,7 @@ const Footer = () => {
               Following the journey of a rising football star from Chania, Greece.
             </p>
             <div className="flex gap-4">
-              {socialLinks.map((social, index) => (
+              {socialLinksArray.map((social, index) => (
                 <motion.a
                   key={social.label}
                   href={social.href}
@@ -73,7 +106,7 @@ const Footer = () => {
             <h4 className="text-xl font-bold mb-4">Quick Links</h4>
             <ul className="space-y-2">
               <li>
-                <button 
+                <button
                   onClick={() => handleNavClick('#home')}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
@@ -81,7 +114,7 @@ const Footer = () => {
                 </button>
               </li>
               <li>
-                <button 
+                <button
                   onClick={() => handleNavClick('#about')}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
@@ -89,7 +122,15 @@ const Footer = () => {
                 </button>
               </li>
               <li>
-                <button 
+                <button
+                  onClick={() => handleNavClick('#bio')}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Bio
+                </button>
+              </li>
+              <li>
+                <button
                   onClick={() => handleNavClick('#skills')}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
@@ -97,7 +138,7 @@ const Footer = () => {
                 </button>
               </li>
               <li>
-                <button 
+                <button
                   onClick={() => handleNavClick('#gallery')}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
@@ -105,7 +146,7 @@ const Footer = () => {
                 </button>
               </li>
               <li>
-                <button 
+                <button
                   onClick={() => handleNavClick('#videos')}
                   className="text-gray-400 hover:text-white transition-colors"
                 >
@@ -113,7 +154,7 @@ const Footer = () => {
                 </button>
               </li>
               <li>
-                <button 
+                <button
                   onClick={() => handleNavClick('#contact')}
                   className="text-gray-400 hover:text-white transition-colors"
                 >

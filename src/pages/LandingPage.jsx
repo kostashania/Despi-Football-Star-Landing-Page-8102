@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import Header from '../components/Header';
 import Hero from '../components/Hero';
 import About from '../components/About';
+import ShortBio from '../components/ShortBio';
 import Skills from '../components/Skills';
 import Gallery from '../components/Gallery';
 import Videos from '../components/Videos';
@@ -15,6 +16,7 @@ const LandingPage = () => {
       <Header />
       <Hero />
       <About />
+      <ShortBio />
       <Skills />
       <Gallery />
       <Videos />

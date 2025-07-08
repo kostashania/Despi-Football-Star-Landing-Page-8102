@@ -5,7 +5,7 @@ import * as FiIcons from 'react-icons/fi';
 import supabase from '../lib/supabase';
 import ReCAPTCHA from 'react-google-recaptcha';
 
-const { FiMail, FiPhone, FiMapPin, FiYoutube, FiInstagram, FiTwitter, FiCheck } = FiIcons;
+const { FiMail, FiPhone, FiMapPin, FiYoutube, FiInstagram, FiFacebook, FiCheck } = FiIcons;
 
 const Contact = () => {
   const [form, setForm] = useState({
@@ -21,75 +21,65 @@ const Contact = () => {
     siteKey: ''
   });
   const [recaptchaValue, setRecaptchaValue] = useState(null);
+  const [socialLinks, setSocialLinks] = useState({
+    youtube: 'https://www.youtube.com/@despi5740',
+    instagram: 'https://instagram.com/despi_football',
+    facebook: 'https://facebook.com/despi.football'
+  });
 
   const contactInfo = [
-    {
-      icon: FiMapPin,
-      label: 'Location',
-      value: 'Chania, Greece'
-    },
-    {
-      icon: FiMail,
-      label: 'Email',
-      value: 'despihania@gmail.com'
-    },
-    {
-      icon: FiPhone,
-      label: 'Phone',
-      value: '+30 698 414 6197 (Mr Kostas)'
-    }
-  ];
-
-  const socialLinks = [
-    {
-      icon: FiYoutube,
-      href: 'https://www.youtube.com/@despi5740',
-      label: 'YouTube'
-    },
-    {
-      icon: FiInstagram,
-      href: '#',
-      label: 'Instagram'
-    },
-    {
-      icon: FiTwitter,
-      href: '#',
-      label: 'Twitter'
-    }
+    { icon: FiMapPin, label: 'Location', value: 'Chania, Greece' },
+    { icon: FiMail, label: 'Email', value: 'despihania@gmail.com' },
+    { icon: FiPhone, label: 'Phone', value: '+30 698 414 6197 (Mr Kostas)' }
   ];
 
   useEffect(() => {
-    fetchRecaptchaSettings();
+    fetchSettings();
   }, []);
 
-  const fetchRecaptchaSettings = async () => {
+  const fetchSettings = async () => {
     try {
       const { data, error } = await supabase
         .from('admin_settings_despi_9a7b3c4d2e')
         .select('*')
-        .in('setting_key', ['recaptcha_enabled', 'recaptcha_site_key']);
-        
+        .in('setting_key', [
+          'recaptcha_enabled', 
+          'recaptcha_site_key',
+          'social_youtube_url',
+          'social_instagram_url',
+          'social_facebook_url'
+        ]);
+
       if (error) throw error;
-      
+
       const settings = {};
       data.forEach(setting => {
         settings[setting.setting_key] = setting.setting_value;
       });
-      
+
       setRecaptchaSettings({
         enabled: settings.recaptcha_enabled === 'true',
         siteKey: settings.recaptcha_site_key || ''
       });
+
+      setSocialLinks({
+        youtube: settings.social_youtube_url || 'https://www.youtube.com/@despi5740',
+        instagram: settings.social_instagram_url || 'https://instagram.com/despi_football',
+        facebook: settings.social_facebook_url || 'https://facebook.com/despi.football'
+      });
     } catch (error) {
-      console.error('Error fetching reCAPTCHA settings:', error);
+      console.error('Error fetching settings:', error);
     }
   };
 
+  const socialLinksArray = [
+    { icon: FiYoutube, href: socialLinks.youtube, label: 'YouTube' },
+    { icon: FiInstagram, href: socialLinks.instagram, label: 'Instagram' },
+    { icon: FiFacebook, href: socialLinks.facebook, label: 'Facebook' }
+  ];
+
   const handleChange = (e) => {
-    setForm({
-      ...form,
-      [e.target.name]: e.target.value
-    });
+    setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const handleRecaptchaChange = (value) => {
@@ -100,7 +90,7 @@ const Contact = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
-    
+
     try {
       // If reCAPTCHA is enabled, verify it
       if (recaptchaSettings.enabled && recaptchaSettings.siteKey) {
@@ -108,7 +98,7 @@ const Contact = () => {
           throw new Error('Please complete the reCAPTCHA verification');
         }
       }
-      
+
       const { error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
         .insert([
@@ -119,21 +109,17 @@ const Contact = () => {
             created_at: new Date()
           }
         ]);
-        
+
       if (error) throw error;
-      
+
       setSubmitSuccess(true);
-      setForm({
-        name: '',
-        email: '',
-        message: ''
-      });
-      
+      setForm({ name: '', email: '', message: '' });
+
       // Reset reCAPTCHA
       if (recaptchaSettings.enabled && window.grecaptcha) {
         window.grecaptcha.reset();
       }
-      
+
       // Reset success message after 5 seconds
       setTimeout(() => {
         setSubmitSuccess(false);
@@ -173,7 +159,7 @@ const Contact = () => {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               Contact Information
             </h3>
-            
+
             {contactInfo.map((info, index) => (
               <motion.div
                 key={info.label}
@@ -195,7 +181,7 @@ const Contact = () => {
             <div className="pt-8">
               <h4 className="text-xl font-bold text-gray-900 mb-4">Follow Despi</h4>
               <div className="flex gap-4">
-                {socialLinks.map((social, index) => (
+                {socialLinksArray.map((social, index) => (
                   <motion.a
                     key={social.label}
                     href={social.href}
@@ -223,7 +209,7 @@ const Contact = () => {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               Send a Message
             </h3>
-            
+
             {submitSuccess && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
@@ -234,7 +220,7 @@ const Contact = () => {
                 <p className="text-green-800">Thank you! Your message has been sent successfully.</p>
               </motion.div>
             )}
-            
+
             {errorMessage && (
               <div className="bg-red-100 p-4 rounded-lg text-red-800 mb-6">
                 {errorMessage}
@@ -257,7 +243,7 @@ const Contact = () => {
                   placeholder="Your name"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email
@@ -273,7 +259,7 @@ const Contact = () => {
                   placeholder="Your email"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Message
@@ -288,7 +274,7 @@ const Contact = () => {
                   placeholder="Your message"
                 ></textarea>
               </div>
-              
+
               {recaptchaSettings.enabled && recaptchaSettings.siteKey && (
                 <div className="flex justify-center">
                   <ReCAPTCHA
@@ -297,7 +283,7 @@ const Contact = () => {
                   />
                 </div>
               )}
-              
+
               <button
                 type="submit"
                 disabled={isSubmitting || (recaptchaSettings.enabled && !recaptchaValue)}

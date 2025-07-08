@@ -11,6 +11,7 @@ const Header = () => {
   const navItems = [
     { name: 'Home', href: '#home' },
     { name: 'About', href: '#about' },
+    { name: 'Bio', href: '#bio' },
     { name: 'Skills', href: '#skills' },
     { name: 'Gallery', href: '#gallery' },
     { name: 'Videos', href: '#videos' },
@@ -19,13 +20,11 @@ const Header = () => {
 
   const handleNavClick = (href) => {
     setIsMenuOpen(false);
-    
     // Smooth scroll to section
     const element = document.querySelector(href);
     if (element) {
       const headerHeight = 80; // Account for fixed header
       const elementPosition = element.offsetTop - headerHeight;
-      
       window.scrollTo({
         top: elementPosition,
         behavior: 'smooth'
@@ -72,10 +71,7 @@ const Header = () => {
             className="md:hidden"
             onClick={() => setIsMenuOpen(!isMenuOpen)}
           >
-            <SafeIcon
-              icon={isMenuOpen ? FiX : FiMenu}
-              className="w-6 h-6 text-gray-700"
-            />
+            <SafeIcon icon={isMenuOpen ? FiX : FiMenu} className="w-6 h-6 text-gray-700" />
           </button>
         </div>
 
