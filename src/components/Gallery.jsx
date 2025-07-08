@@ -4,12 +4,18 @@ import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import supabase from '../lib/supabase';
 import ImageUploader from './ImageUploader';
+import ReCAPTCHA from 'react-google-recaptcha';
 
-const { FiX, FiUpload, FiPlus, FiImage } = FiIcons;
+const { FiX, FiUpload, FiPlus, FiImage, FiClock } = FiIcons;
 
 const Gallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
   const [showUploader, setShowUploader] = useState(false);
+  const [recaptchaSettings, setRecaptchaSettings] = useState({
+    enabled: false,
+    siteKey: ''
+  });
+  const [recaptchaValue, setRecaptchaValue] = useState(null);
   const [images, setImages] = useState([
     {
       src: "https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962901891-blob",
@@ -45,13 +51,38 @@ const Gallery = () => {
 
   useEffect(() => {
     fetchGalleryImages();
+    fetchRecaptchaSettings();
   }, []);
+
+  const fetchRecaptchaSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_settings_despi_9a7b3c4d2e')
+        .select('*')
+        .in('setting_key', ['recaptcha_enabled', 'recaptcha_site_key']);
+
+      if (error) throw error;
+
+      const settings = {};
+      data.forEach(setting => {
+        settings[setting.setting_key] = setting.setting_value;
+      });
+
+      setRecaptchaSettings({
+        enabled: settings.recaptcha_enabled === 'true',
+        siteKey: settings.recaptcha_site_key || ''
+      });
+    } catch (error) {
+      console.error('Error fetching reCAPTCHA settings:', error);
+    }
+  };
 
   const fetchGalleryImages = async () => {
     try {
       const { data, error } = await supabase
         .from('gallery_images_despi_9a7b3c4d2e')
         .select('*')
+        .eq('is_approved', true) // Only show approved images
         .order('sort_order', { ascending: true });
 
       if (error) throw error;
@@ -71,14 +102,29 @@ const Gallery = () => {
     }
   };
 
+  const handleRecaptchaChange = (value) => {
+    setRecaptchaValue(value);
+  };
+
   const handleUploadSuccess = async (imageUrl) => {
     try {
-      // Create a new image entry with default values
+      // Check reCAPTCHA if enabled
+      if (recaptchaSettings.enabled && recaptchaSettings.siteKey) {
+        if (!recaptchaValue) {
+          alert('Please complete the reCAPTCHA verification before uploading.');
+          return;
+        }
+      }
+
+      // Create a new image entry with approval pending
       const newImage = {
-        title: 'New Upload',
-        alt_text: 'Uploaded football image',
+        title: 'User Upload - Pending Approval',
+        alt_text: 'User uploaded football image',
         image_url: imageUrl,
-        is_featured: false
+        is_featured: false,
+        is_approved: false, // Requires admin approval
+        uploaded_by: 'public_user',
+        upload_status: 'pending'
       };
 
       // Get the next sort order
@@ -104,11 +150,15 @@ const Gallery = () => {
 
       if (error) throw error;
 
-      // Refresh the gallery
-      fetchGalleryImages();
+      // Reset reCAPTCHA
+      if (recaptchaSettings.enabled && window.grecaptcha) {
+        window.grecaptcha.reset();
+        setRecaptchaValue(null);
+      }
+
       setShowUploader(false);
       
-      alert('Image uploaded successfully!');
+      alert('Image uploaded successfully! It will be reviewed by an admin before being published.');
     } catch (error) {
       console.error('Error saving uploaded image:', error);
       alert('Error saving uploaded image. Please try again.');
@@ -146,6 +196,10 @@ const Gallery = () => {
             <SafeIcon icon={FiUpload} className="w-5 h-5" />
             Share Your Photo
           </button>
+          <p className="text-sm text-gray-500 mt-2">
+            <SafeIcon icon={FiClock} className="w-4 h-4 inline mr-1" />
+            Uploaded photos will be reviewed before being published
+          </p>
         </motion.div>
 
         {/* Image Uploader Modal */}
@@ -174,13 +228,22 @@ const Gallery = () => {
                 </button>
               </div>
               
-              <p className="text-gray-600 mb-6">
+              <p className="text-gray-600 mb-4">
                 Share your photos of Despi's matches, training, or football moments!
+              </p>
+              
+              <p className="text-sm text-orange-600 mb-6 bg-orange-50 p-3 rounded-lg">
+                <SafeIcon icon={FiClock} className="w-4 h-4 inline mr-1" />
+                Your photo will be reviewed by an admin before being published in the gallery.
               </p>
 
               <ImageUploader
                 onUploadSuccess={handleUploadSuccess}
                 onCancel={() => setShowUploader(false)}
+                showRecaptcha={recaptchaSettings.enabled && recaptchaSettings.siteKey}
+                recaptchaSettings={recaptchaSettings}
+                onRecaptchaChange={handleRecaptchaChange}
+                recaptchaValue={recaptchaValue}
               />
             </motion.div>
           </motion.div>
