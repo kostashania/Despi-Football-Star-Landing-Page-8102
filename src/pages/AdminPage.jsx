@@ -3,10 +3,13 @@ import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import supabase from '../lib/supabase';
+import AdminLogin from '../components/AdminLogin';
+import { isAuthenticated, logout } from '../utils/auth';
 
-const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube } = FiIcons;
+const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut } = FiIcons;
 
 const AdminPage = () => {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [activeTab, setActiveTab] = useState('hero');
   const [heroContent, setHeroContent] = useState({
     title: 'Meet Despi',
@@ -33,8 +36,23 @@ const AdminPage = () => {
   ];
 
   useEffect(() => {
-    fetchData();
-  }, [activeTab]);
+    setIsLoggedIn(isAuthenticated());
+  }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) {
+      fetchData();
+    }
+  }, [activeTab, isLoggedIn]);
+
+  const handleLogin = () => {
+    setIsLoggedIn(true);
+  };
+
+  const handleLogout = () => {
+    logout();
+    setIsLoggedIn(false);
+  };
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -211,6 +229,11 @@ const AdminPage = () => {
       alert('Error deleting message. Please try again.');
     }
   };
+
+  // Show login form if not authenticated
+  if (!isLoggedIn) {
+    return <AdminLogin onLogin={handleLogin} />;
+  }
 
   const renderHeroTab = () => (
     <div className="space-y-6">
@@ -477,10 +500,17 @@ const AdminPage = () => {
                   </button>
                 ))}
               </nav>
-              <div className="mt-auto pt-6 border-t border-gray-700 mt-6">
+              <div className="mt-auto pt-6 border-t border-gray-700 mt-6 space-y-2">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center gap-2 text-gray-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-gray-700"
+                >
+                  <SafeIcon icon={FiLogOut} />
+                  Logout
+                </button>
                 <a 
                   href="/"
-                  className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors"
+                  className="flex items-center gap-2 text-gray-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-gray-700"
                 >
                   <span>Return to Website</span>
                 </a>

@@ -10,9 +10,19 @@ const Gallery = () => {
 
   const images = [
     {
-      src: "https://images.unsplash.com/photo-1551698618-1dfe5d97d256?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
+      src: "https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962901891-blob",
       alt: "Despi in action",
       title: "Goal Celebration"
+    },
+    {
+      src: "https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962951856-blob",
+      alt: "Despi football moment",
+      title: "Match Winner"
+    },
+    {
+      src: "https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959485547-blob",
+      alt: "Despi portrait",
+      title: "Rising Star"
     },
     {
       src: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
@@ -25,19 +35,9 @@ const Gallery = () => {
       title: "Team Spirit"
     },
     {
-      src: "https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-      alt: "Match action",
-      title: "Match Winner"
-    },
-    {
       src: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
       alt: "Skills training",
       title: "Skill Development"
-    },
-    {
-      src: "https://images.unsplash.com/photo-1577223625816-7546f13df25d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80",
-      alt: "Victory moment",
-      title: "Victory Dance"
     }
   ];
 

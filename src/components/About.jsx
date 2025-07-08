@@ -7,10 +7,26 @@ const { FiMapPin, FiCalendar, FiTrendingUp, FiHeart } = FiIcons;
 
 const About = () => {
   const stats = [
-    { icon: FiMapPin, label: 'From', value: 'Chania, Greece' },
-    { icon: FiCalendar, label: 'Age', value: '10 Years Old' },
-    { icon: FiTrendingUp, label: 'Position', value: 'Forward' },
-    { icon: FiHeart, label: 'Passion', value: 'Football' }
+    {
+      icon: FiMapPin,
+      label: 'From',
+      value: 'Chania, Greece'
+    },
+    {
+      icon: FiCalendar,
+      label: 'Age',
+      value: '10 Years Old'
+    },
+    {
+      icon: FiTrendingUp,
+      label: 'Position',
+      value: 'Forward'
+    },
+    {
+      icon: FiHeart,
+      label: 'Passion',
+      value: 'Football'
+    }
   ];
 
   return (
@@ -26,8 +42,7 @@ const About = () => {
             About Despi
           </h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            A young football prodigy from Chania, Greece, making waves in the football world 
-            with her exceptional skills and dedication to the sport.
+            A young football prodigy from Chania, Greece, making waves in the football world with her exceptional skills and dedication to the sport.
           </p>
         </motion.div>
 
@@ -38,7 +53,7 @@ const About = () => {
             transition={{ duration: 0.8 }}
           >
             <img
-              src="https://images.unsplash.com/photo-1574629810360-7efbbe195018?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2093&q=80"
+              src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962901891-blob"
               alt="Despi training"
               className="rounded-2xl shadow-2xl w-full h-[500px] object-cover"
             />
@@ -55,16 +70,11 @@ const About = () => {
             </h3>
             
             <p className="text-gray-600 leading-relaxed">
-              Despi (Δέσποινα Ασβεστά) is a remarkable young talent from Chania, Greece, 
-              who has been making headlines with her incredible football skills at just 10 years old. 
-              Her dedication to the sport and natural ability have caught the attention of football 
-              enthusiasts across Greece.
+              Despi (Δέσποινα Ασβεστά) is a remarkable young talent from Chania, Greece, who has been making headlines with her incredible football skills at just 10 years old. Her dedication to the sport and natural ability have caught the attention of football enthusiasts across Greece.
             </p>
-
+            
             <p className="text-gray-600 leading-relaxed">
-              Known for her amazing goals and technical abilities, Despi represents the future 
-              of women's football. Her passion for the game is evident in every match she plays, 
-              inspiring young girls everywhere to pursue their football dreams.
+              Known for her amazing goals and technical abilities, Despi represents the future of women's football. Her passion for the game is evident in every match she plays, inspiring young girls everywhere to pursue their football dreams.
             </p>
 
             <div className="grid grid-cols-2 gap-4 mt-8">
