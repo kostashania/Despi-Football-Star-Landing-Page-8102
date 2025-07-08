@@ -4,9 +4,11 @@ import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import supabase from '../lib/supabase';
 import AdminLogin from '../components/AdminLogin';
+import ImageUploader from '../components/ImageUploader';
 import { isAuthenticated, logout } from '../utils/auth';
+import { validateImageUrl } from '../utils/imageUpload';
 
-const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, FiSettings, FiImage, FiArrowUp, FiArrowDown } = FiIcons;
+const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, FiSettings, FiImage, FiArrowUp, FiArrowDown, FiUpload, FiExternalLink, FiLink } = FiIcons;
 
 const AdminPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -28,6 +30,7 @@ const AdminPage = () => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [currentVideo, setCurrentVideo] = useState({
     title: '',
     description: '',
@@ -116,22 +119,37 @@ const AdminPage = () => {
         setMessages(data || []);
       }
       else if (activeTab === 'settings') {
-        const { data, error } = await supabase
-          .from('admin_settings_despi_9a7b3c4d2e')
-          .select('*');
+        try {
+          // First, ensure the settings table exists
+          await supabase.query(`
+            CREATE TABLE IF NOT EXISTS admin_settings_despi_9a7b3c4d2e (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              setting_key TEXT UNIQUE NOT NULL,
+              setting_value TEXT,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+            );
+          `);
           
-        if (error) throw error;
-        
-        const settingsObj = {};
-        (data || []).forEach(setting => {
-          settingsObj[setting.setting_key] = setting.setting_value;
-        });
-        
-        setSettings({
-          recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
-          recaptcha_site_key: settingsObj.recaptcha_site_key || '',
-          recaptcha_secret_key: settingsObj.recaptcha_secret_key || ''
-        });
+          const { data, error } = await supabase
+            .from('admin_settings_despi_9a7b3c4d2e')
+            .select('*');
+            
+          if (error) throw error;
+          
+          const settingsObj = {};
+          (data || []).forEach(setting => {
+            settingsObj[setting.setting_key] = setting.setting_value;
+          });
+          
+          setSettings({
+            recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
+            recaptcha_site_key: settingsObj.recaptcha_site_key || '',
+            recaptcha_secret_key: settingsObj.recaptcha_secret_key || ''
+          });
+        } catch (error) {
+          console.error('Error fetching settings:', error);
+        }
       }
     } catch (error) {
       console.error(`Error fetching ${activeTab} data:`, error);
@@ -173,8 +191,20 @@ const AdminPage = () => {
 
   const saveSettings = async () => {
     try {
-      // First check if table exists, if not create it
-      await supabase.rpc('create_admin_settings_if_not_exists');
+      // First create the table if it doesn't exist
+      try {
+        await supabase.query(`
+          CREATE TABLE IF NOT EXISTS admin_settings_despi_9a7b3c4d2e (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            setting_key TEXT UNIQUE NOT NULL,
+            setting_value TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+          );
+        `);
+      } catch (error) {
+        console.error('Error ensuring admin_settings table exists:', error);
+      }
       
       const settingsToSave = [
         { setting_key: 'recaptcha_enabled', setting_value: settings.recaptcha_enabled.toString() },
@@ -183,11 +213,29 @@ const AdminPage = () => {
       ];
 
       for (const setting of settingsToSave) {
-        const { error } = await supabase
+        // Check if setting exists
+        const { data, error: checkError } = await supabase
           .from('admin_settings_despi_9a7b3c4d2e')
-          .upsert(setting, { onConflict: 'setting_key' });
-          
-        if (error) throw error;
+          .select('id')
+          .eq('setting_key', setting.setting_key)
+          .single();
+        
+        let result;
+        
+        if (data) {
+          // Update existing setting
+          result = await supabase
+            .from('admin_settings_despi_9a7b3c4d2e')
+            .update({ setting_value: setting.setting_value })
+            .eq('setting_key', setting.setting_key);
+        } else {
+          // Insert new setting
+          result = await supabase
+            .from('admin_settings_despi_9a7b3c4d2e')
+            .insert([setting]);
+        }
+        
+        if (result.error) throw result.error;
       }
       
       alert('Settings saved successfully!');
@@ -226,17 +274,23 @@ const AdminPage = () => {
       }
       
       // Prevent adding music videos or unwanted content
-      if (currentVideo.title.toLowerCase().includes('music') || 
-          currentVideo.description.toLowerCase().includes('music') ||
-          youtubeId === 'dQw4w9WgXcQ') {
+      if (
+        currentVideo.title.toLowerCase().includes('music') || 
+        currentVideo.description.toLowerCase().includes('music') ||
+        youtubeId === 'dQw4w9WgXcQ'
+      ) {
         alert('This video cannot be added. Please select a football-related video.');
         return;
       }
       
+      // Use mqdefault.jpg instead of maxresdefault.jpg to avoid 404 errors
+      const thumbnailUrl = currentVideo.thumbnail_url || 
+        (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : null);
+      
       const videoData = {
         ...currentVideo,
         youtube_id: youtubeId,
-        thumbnail_url: currentVideo.thumbnail_url || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg` : null),
+        thumbnail_url: thumbnailUrl,
         created_at: new Date()
       };
       
@@ -274,6 +328,13 @@ const AdminPage = () => {
     e.preventDefault();
     
     try {
+      // Validate image URL
+      const isValid = await validateImageUrl(currentImage.image_url);
+      if (!isValid) {
+        alert('The image URL is invalid or inaccessible. Please check and try again.');
+        return;
+      }
+      
       // Calculate the next sort order if it's a new image
       let nextSortOrder = 0;
       if (!currentImage.id) {
@@ -319,6 +380,64 @@ const AdminPage = () => {
     } catch (error) {
       console.error('Error saving gallery image:', error);
       alert('Error saving gallery image. Please try again.');
+    }
+  };
+
+  const handleUploadSuccess = async (imageUrl) => {
+    try {
+      setCurrentImage({
+        ...currentImage,
+        image_url: imageUrl
+      });
+      
+      setIsUploading(false);
+      
+      // If we have enough info, save the image automatically
+      if (currentImage.title && currentImage.alt_text) {
+        const imageData = {
+          title: currentImage.title || 'Uploaded Image', 
+          alt_text: currentImage.alt_text || 'Football image',
+          image_url: imageUrl,
+          is_featured: currentImage.is_featured || false
+        };
+        
+        // Calculate the next sort order
+        const { data } = await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .select('sort_order')
+          .order('sort_order', { ascending: false })
+          .limit(1);
+          
+        const nextSortOrder = data && data.length > 0 ? data[0].sort_order + 1 : 0;
+        
+        const { error } = await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .insert([{
+            ...imageData,
+            sort_order: nextSortOrder,
+            updated_at: new Date()
+          }]);
+          
+        if (error) throw error;
+        
+        // Reset form and fetch updated data
+        setCurrentImage({
+          title: '',
+          alt_text: '',
+          image_url: '',
+          is_featured: false
+        });
+        
+        fetchData();
+        
+        alert('Image uploaded and saved successfully!');
+      } else {
+        // If we don't have enough info, show the form to complete it
+        setIsEditing(true);
+      }
+    } catch (error) {
+      console.error('Error handling upload success:', error);
+      alert('Error processing uploaded image. Please try again.');
     }
   };
 
@@ -491,24 +610,81 @@ const AdminPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Manage Gallery</h3>
-        {!isEditing && (
-          <button 
-            onClick={() => {
-              setCurrentImage({
-                title: '',
-                alt_text: '',
-                image_url: '',
-                is_featured: false
-              });
-              setIsEditing(true);
-            }}
-            className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
-          >
-            <SafeIcon icon={FiPlus} />
-            Add New Image
-          </button>
+        {!isEditing && !isUploading && (
+          <div className="flex gap-2">
+            <button 
+              onClick={() => {
+                setCurrentImage({
+                  title: '',
+                  alt_text: '',
+                  image_url: '',
+                  is_featured: false
+                });
+                setIsEditing(true);
+              }}
+              className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+            >
+              <SafeIcon icon={FiLink} />
+              Add Image URL
+            </button>
+            <button 
+              onClick={() => setIsUploading(true)}
+              className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+            >
+              <SafeIcon icon={FiUpload} />
+              Upload Image
+            </button>
+          </div>
         )}
       </div>
+      
+      {isUploading && (
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                <input 
+                  type="text" 
+                  name="title"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={currentImage.title}
+                  onChange={handleImageChange}
+                  placeholder="Enter image title"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Alt Text</label>
+                <input 
+                  type="text"
+                  name="alt_text"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={currentImage.alt_text || ''}
+                  onChange={handleImageChange}
+                  placeholder="Enter image description"
+                />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 mb-4">
+              <input
+                type="checkbox"
+                id="upload_is_featured"
+                name="is_featured"
+                checked={currentImage.is_featured || false}
+                onChange={handleImageChange}
+                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+              />
+              <label htmlFor="upload_is_featured" className="text-sm font-medium text-gray-700">
+                Featured Image
+              </label>
+            </div>
+          </div>
+          <ImageUploader 
+            onUploadSuccess={handleUploadSuccess} 
+            onCancel={() => setIsUploading(false)} 
+          />
+        </div>
+      )}
       
       {isEditing && (
         <div className="bg-gray-50 p-4 rounded-lg">
@@ -572,6 +748,20 @@ const AdminPage = () => {
               <p className="text-xs text-gray-500 mt-1">Enter full image URL</p>
             </div>
             
+            {currentImage.image_url && (
+              <div className="border rounded-md p-2 bg-white">
+                <p className="text-sm font-medium text-gray-700 mb-2">Image Preview:</p>
+                <img 
+                  src={currentImage.image_url} 
+                  alt="Preview" 
+                  className="max-h-40 max-w-full object-contain mx-auto"
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/300x200?text=Invalid+Image';
+                  }}
+                />
+              </div>
+            )}
+            
             <div className="flex items-center gap-3">
               <input
                 type="checkbox"
@@ -628,6 +818,17 @@ const AdminPage = () => {
                     )}
                   </div>
                   <p className="text-sm text-gray-600">{image.alt_text}</p>
+                  <div className="mt-2">
+                    <a 
+                      href={image.image_url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-xs text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                    >
+                      <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
+                      View full image
+                    </a>
+                  </div>
                 </div>
                 <div className="flex-shrink-0 flex flex-col gap-2">
                   <div className="flex gap-1">
@@ -673,7 +874,15 @@ const AdminPage = () => {
         <h3 className="text-xl font-semibold">Manage Videos</h3>
         {!isEditing && (
           <button 
-            onClick={() => setIsEditing(true)}
+            onClick={() => {
+              setCurrentVideo({
+                title: '',
+                description: '',
+                url: '',
+                thumbnail_url: ''
+              });
+              setIsEditing(true);
+            }}
             className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
           >
             <SafeIcon icon={FiPlus} />
@@ -752,6 +961,9 @@ const AdminPage = () => {
                 onChange={handleVideoChange}
                 placeholder="Leave blank to use YouTube thumbnail"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                If left blank, a medium quality YouTube thumbnail will be used automatically
+              </p>
             </div>
             
             <div className="pt-2">

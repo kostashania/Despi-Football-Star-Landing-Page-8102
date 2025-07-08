@@ -14,22 +14,65 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   }
 });
 
-// Create a helper function to create tables if they don't exist
+// Create required tables if they don't exist
 const createRequiredTables = async () => {
   try {
-    // Create the RPC function if it doesn't exist
-    await supabase.rpc('create_admin_settings_if_not_exists').catch(() => {
-      // If the RPC doesn't exist, create it
-      return supabase.rpc('create_rpc_function', {
-        function_name: 'create_admin_settings_if_not_exists'
-      });
-    });
+    // Create admin_settings table if it doesn't exist
+    await supabase.query(`
+      CREATE TABLE IF NOT EXISTS admin_settings_despi_9a7b3c4d2e (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        setting_key TEXT UNIQUE NOT NULL,
+        setting_value TEXT,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+      );
+    `).catch(err => console.error('Error creating admin_settings table:', err));
+    
+    // Enable RLS on admin_settings
+    await supabase.query(`
+      ALTER TABLE admin_settings_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+    `).catch(() => {});
+    
+    await supabase.query(`
+      DROP POLICY IF EXISTS "Enable all operations for all users" ON admin_settings_despi_9a7b3c4d2e;
+      CREATE POLICY "Enable all operations for all users" ON admin_settings_despi_9a7b3c4d2e USING (true);
+    `).catch(() => {});
+    
+    // Create gallery_images table if it doesn't exist
+    await supabase.query(`
+      CREATE TABLE IF NOT EXISTS gallery_images_despi_9a7b3c4d2e (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        title TEXT NOT NULL,
+        alt_text TEXT,
+        image_url TEXT NOT NULL,
+        is_featured BOOLEAN DEFAULT false,
+        sort_order INTEGER DEFAULT 0,
+        created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
+        updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
+      );
+    `).catch(err => console.error('Error creating gallery_images table:', err));
+    
+    // Enable RLS on gallery_images
+    await supabase.query(`
+      ALTER TABLE gallery_images_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+    `).catch(() => {});
+    
+    await supabase.query(`
+      DROP POLICY IF EXISTS "Enable read access for all users" ON gallery_images_despi_9a7b3c4d2e;
+      CREATE POLICY "Enable read access for all users" ON gallery_images_despi_9a7b3c4d2e FOR SELECT USING (true);
+    `).catch(() => {});
+    
+    await supabase.query(`
+      DROP POLICY IF EXISTS "Enable all operations for all users" ON gallery_images_despi_9a7b3c4d2e;
+      CREATE POLICY "Enable all operations for all users" ON gallery_images_despi_9a7b3c4d2e USING (true);
+    `).catch(() => {});
+    
   } catch (error) {
     console.error('Error initializing database:', error);
   }
 };
 
-// Initialize database when the app starts
+// Initialize database when supabase client is created
 createRequiredTables();
 
 export default supabase;

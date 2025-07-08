@@ -23,14 +23,14 @@ const Videos = () => {
           .from('videos_despi_9a7b3c4d2e')
           .select('*')
           .order('created_at', { ascending: false });
-
+          
         if (error) throw error;
         
         if (data && data.length > 0) {
           // Filter out unwanted videos and only show football-related content
           const filteredVideos = data.filter(video => 
-            !video.title.toLowerCase().includes('music') &&
-            !video.description.toLowerCase().includes('music') &&
+            !video.title.toLowerCase().includes('music') && 
+            !video.description.toLowerCase().includes('music') && 
             video.youtube_id !== 'dQw4w9WgXcQ'
           );
           setVideos(filteredVideos);
@@ -39,19 +39,22 @@ const Videos = () => {
         console.error('Error fetching videos:', error);
       }
     };
-
+    
     fetchVideos();
   }, []);
 
   const extractYoutubeId = (url) => {
     if (!url) return null;
+    
     const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
     const match = url.match(regExp);
+    
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
   const getYouTubeThumbnail = (videoId) => {
-    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+    // Use mqdefault.jpg instead of maxresdefault.jpg to avoid 404 errors
+    return `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`;
   };
 
   return (
@@ -75,7 +78,7 @@ const Videos = () => {
           {videos.map((video, index) => {
             const videoId = video.youtube_id || extractYoutubeId(video.url) || video.id;
             const thumbnailUrl = video.thumbnail_url || getYouTubeThumbnail(videoId);
-
+            
             return (
               <motion.div
                 key={videoId || index}
@@ -110,7 +113,8 @@ const Videos = () => {
                     onClick={() => window.open(video.url || `https://www.youtube.com/watch?v=${videoId}`, '_blank')}
                     className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
                   >
-                    Watch Video <SafeIcon icon={FiExternalLink} className="w-4 h-4" />
+                    Watch Video
+                    <SafeIcon icon={FiExternalLink} className="w-4 h-4" />
                   </button>
                 </div>
               </motion.div>

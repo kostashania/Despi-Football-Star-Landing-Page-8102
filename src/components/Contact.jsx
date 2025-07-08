@@ -3,6 +3,7 @@ import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import supabase from '../lib/supabase';
+import ReCAPTCHA from 'react-google-recaptcha';
 
 const { FiMail, FiPhone, FiMapPin, FiYoutube, FiInstagram, FiTwitter, FiCheck } = FiIcons;
 
@@ -19,6 +20,7 @@ const Contact = () => {
     enabled: false,
     siteKey: ''
   });
+  const [recaptchaValue, setRecaptchaValue] = useState(null);
 
   const contactInfo = [
     {
@@ -66,14 +68,14 @@ const Contact = () => {
         .from('admin_settings_despi_9a7b3c4d2e')
         .select('*')
         .in('setting_key', ['recaptcha_enabled', 'recaptcha_site_key']);
-
+        
       if (error) throw error;
-
+      
       const settings = {};
       data.forEach(setting => {
         settings[setting.setting_key] = setting.setting_value;
       });
-
+      
       setRecaptchaSettings({
         enabled: settings.recaptcha_enabled === 'true',
         siteKey: settings.recaptcha_site_key || ''
@@ -90,18 +92,23 @@ const Contact = () => {
     });
   };
 
+  const handleRecaptchaChange = (value) => {
+    setRecaptchaValue(value);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
-
+    
     try {
-      // If reCAPTCHA is enabled, verify it here
+      // If reCAPTCHA is enabled, verify it
       if (recaptchaSettings.enabled && recaptchaSettings.siteKey) {
-        // Add reCAPTCHA verification logic here
-        // For now, we'll skip this step
+        if (!recaptchaValue) {
+          throw new Error('Please complete the reCAPTCHA verification');
+        }
       }
-
+      
       const { error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
         .insert([
@@ -112,17 +119,25 @@ const Contact = () => {
             created_at: new Date()
           }
         ]);
-
+        
       if (error) throw error;
-
+      
       setSubmitSuccess(true);
-      setForm({ name: '', email: '', message: '' });
-
+      setForm({
+        name: '',
+        email: '',
+        message: ''
+      });
+      
+      // Reset reCAPTCHA
+      if (recaptchaSettings.enabled && window.grecaptcha) {
+        window.grecaptcha.reset();
+      }
+      
       // Reset success message after 5 seconds
       setTimeout(() => {
         setSubmitSuccess(false);
       }, 5000);
-
     } catch (error) {
       console.error('Error submitting form:', error);
       setErrorMessage('There was a problem submitting your message. Please try again.');
@@ -158,7 +173,7 @@ const Contact = () => {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               Contact Information
             </h3>
-
+            
             {contactInfo.map((info, index) => (
               <motion.div
                 key={info.label}
@@ -208,8 +223,8 @@ const Contact = () => {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               Send a Message
             </h3>
-
-            {submitSuccess ? (
+            
+            {submitSuccess && (
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -218,13 +233,13 @@ const Contact = () => {
                 <SafeIcon icon={FiCheck} className="text-green-600 w-5 h-5" />
                 <p className="text-green-800">Thank you! Your message has been sent successfully.</p>
               </motion.div>
-            ) : null}
-
-            {errorMessage ? (
+            )}
+            
+            {errorMessage && (
               <div className="bg-red-100 p-4 rounded-lg text-red-800 mb-6">
                 {errorMessage}
               </div>
-            ) : null}
+            )}
 
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
@@ -242,7 +257,7 @@ const Contact = () => {
                   placeholder="Your name"
                 />
               </div>
-
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email
@@ -258,7 +273,7 @@ const Contact = () => {
                   placeholder="Your email"
                 />
               </div>
-
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Message
@@ -273,13 +288,22 @@ const Contact = () => {
                   placeholder="Your message"
                 ></textarea>
               </div>
-
+              
+              {recaptchaSettings.enabled && recaptchaSettings.siteKey && (
+                <div className="flex justify-center">
+                  <ReCAPTCHA
+                    sitekey={recaptchaSettings.siteKey}
+                    onChange={handleRecaptchaChange}
+                  />
+                </div>
+              )}
+              
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || (recaptchaSettings.enabled && !recaptchaValue)}
                 className={`w-full ${
-                  isSubmitting 
-                    ? 'bg-gray-400' 
+                  isSubmitting || (recaptchaSettings.enabled && !recaptchaValue)
+                    ? 'bg-gray-400'
                     : 'bg-green-600 hover:bg-green-700'
                 } text-white py-3 rounded-lg font-medium transition-colors relative`}
               >
