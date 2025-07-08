@@ -6,7 +6,7 @@ import supabase from '../lib/supabase';
 import AdminLogin from '../components/AdminLogin';
 import { isAuthenticated, logout } from '../utils/auth';
 
-const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, FiSettings } = FiIcons;
+const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, FiSettings, FiImage, FiArrowUp, FiArrowDown } = FiIcons;
 
 const AdminPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -20,6 +20,7 @@ const AdminPage = () => {
   
   const [videos, setVideos] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [galleryImages, setGalleryImages] = useState([]);
   const [settings, setSettings] = useState({
     recaptcha_enabled: false,
     recaptcha_site_key: '',
@@ -33,9 +34,16 @@ const AdminPage = () => {
     url: '',
     thumbnail_url: ''
   });
+  const [currentImage, setCurrentImage] = useState({
+    title: '',
+    alt_text: '',
+    image_url: '',
+    is_featured: false
+  });
 
   const tabs = [
     { id: 'hero', label: 'Hero Section', icon: FiEdit },
+    { id: 'gallery', label: 'Gallery', icon: FiImage },
     { id: 'videos', label: 'Videos', icon: FiYoutube },
     { id: 'messages', label: 'Messages', icon: FiMessageSquare },
     { id: 'settings', label: 'Settings', icon: FiSettings }
@@ -74,6 +82,15 @@ const AdminPage = () => {
         if (error && error.code !== 'PGRST116') throw error;
         if (data) setHeroContent(data);
       } 
+      else if (activeTab === 'gallery') {
+        const { data, error } = await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .select('*')
+          .order('sort_order', { ascending: true });
+          
+        if (error) throw error;
+        setGalleryImages(data || []);
+      }
       else if (activeTab === 'videos') {
         const { data, error } = await supabase
           .from('videos_despi_9a7b3c4d2e')
@@ -156,6 +173,9 @@ const AdminPage = () => {
 
   const saveSettings = async () => {
     try {
+      // First check if table exists, if not create it
+      await supabase.rpc('create_admin_settings_if_not_exists');
+      
       const settingsToSave = [
         { setting_key: 'recaptcha_enabled', setting_value: settings.recaptcha_enabled.toString() },
         { setting_key: 'recaptcha_site_key', setting_value: settings.recaptcha_site_key },
@@ -173,7 +193,7 @@ const AdminPage = () => {
       alert('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
-      alert('Error saving settings. Please try again.');
+      alert(`Error saving settings: ${error.message || 'Please try again.'}`);
     }
   };
 
@@ -182,6 +202,14 @@ const AdminPage = () => {
     setCurrentVideo({
       ...currentVideo,
       [name]: value
+    });
+  };
+
+  const handleImageChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    setCurrentImage({
+      ...currentImage,
+      [name]: type === 'checkbox' ? checked : value
     });
   };
 
@@ -242,8 +270,65 @@ const AdminPage = () => {
     }
   };
 
+  const saveImage = async (e) => {
+    e.preventDefault();
+    
+    try {
+      // Calculate the next sort order if it's a new image
+      let nextSortOrder = 0;
+      if (!currentImage.id) {
+        const { data } = await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .select('sort_order')
+          .order('sort_order', { ascending: false })
+          .limit(1);
+          
+        nextSortOrder = data && data.length > 0 ? data[0].sort_order + 1 : 0;
+      }
+      
+      const imageData = {
+        ...currentImage,
+        sort_order: currentImage.sort_order || nextSortOrder,
+        updated_at: new Date()
+      };
+      
+      let result;
+      
+      if (currentImage.id) {
+        result = await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .update(imageData)
+          .eq('id', currentImage.id);
+      } else {
+        result = await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .insert([imageData]);
+      }
+      
+      if (result.error) throw result.error;
+      
+      setCurrentImage({
+        title: '',
+        alt_text: '',
+        image_url: '',
+        is_featured: false
+      });
+      setIsEditing(false);
+      fetchData();
+      
+    } catch (error) {
+      console.error('Error saving gallery image:', error);
+      alert('Error saving gallery image. Please try again.');
+    }
+  };
+
   const editVideo = (video) => {
     setCurrentVideo(video);
+    setIsEditing(true);
+  };
+
+  const editImage = (image) => {
+    setCurrentImage(image);
     setIsEditing(true);
   };
 
@@ -262,6 +347,63 @@ const AdminPage = () => {
     } catch (error) {
       console.error('Error deleting video:', error);
       alert('Error deleting video. Please try again.');
+    }
+  };
+
+  const deleteImage = async (id) => {
+    if (!confirm('Are you sure you want to delete this image?')) return;
+    
+    try {
+      const { error } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .delete()
+        .eq('id', id);
+        
+      if (error) throw error;
+      
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting gallery image:', error);
+      alert('Error deleting gallery image. Please try again.');
+    }
+  };
+
+  const moveImage = async (id, direction) => {
+    try {
+      // Find the current image and its adjacent image
+      const currentImage = galleryImages.find(img => img.id === id);
+      if (!currentImage) return;
+      
+      // Find the adjacent image based on direction
+      const currentIndex = galleryImages.findIndex(img => img.id === id);
+      const adjacentIndex = direction === 'up' ? currentIndex - 1 : currentIndex + 1;
+      
+      // Check if move is possible
+      if (adjacentIndex < 0 || adjacentIndex >= galleryImages.length) return;
+      
+      const adjacentImage = galleryImages[adjacentIndex];
+      
+      // Swap sort orders
+      const tempOrder = currentImage.sort_order;
+      
+      // Update the current image's sort order
+      await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .update({ sort_order: adjacentImage.sort_order })
+        .eq('id', currentImage.id);
+        
+      // Update the adjacent image's sort order
+      await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .update({ sort_order: tempOrder })
+        .eq('id', adjacentImage.id);
+        
+      // Refresh the data
+      fetchData();
+      
+    } catch (error) {
+      console.error('Error reordering gallery images:', error);
+      alert('Error reordering gallery images. Please try again.');
     }
   };
 
@@ -342,6 +484,186 @@ const AdminPage = () => {
           Save Changes
         </button>
       </div>
+    </div>
+  );
+
+  const renderGalleryTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-semibold">Manage Gallery</h3>
+        {!isEditing && (
+          <button 
+            onClick={() => {
+              setCurrentImage({
+                title: '',
+                alt_text: '',
+                image_url: '',
+                is_featured: false
+              });
+              setIsEditing(true);
+            }}
+            className="px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+          >
+            <SafeIcon icon={FiPlus} />
+            Add New Image
+          </button>
+        )}
+      </div>
+      
+      {isEditing && (
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <form onSubmit={saveImage} className="space-y-4">
+            <div className="flex justify-between items-center mb-2">
+              <h4 className="font-medium">{currentImage.id ? 'Edit Image' : 'Add New Image'}</h4>
+              <button 
+                type="button"
+                onClick={() => {
+                  setIsEditing(false);
+                  setCurrentImage({
+                    title: '',
+                    alt_text: '',
+                    image_url: '',
+                    is_featured: false
+                  });
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <SafeIcon icon={FiX} />
+              </button>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input 
+                type="text" 
+                name="title"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={currentImage.title}
+                onChange={handleImageChange}
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Alt Text (Description for accessibility)
+              </label>
+              <input 
+                type="text"
+                name="alt_text"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={currentImage.alt_text || ''}
+                onChange={handleImageChange}
+                required
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Image URL</label>
+              <input 
+                type="url" 
+                name="image_url"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                value={currentImage.image_url}
+                onChange={handleImageChange}
+                required
+                placeholder="https://example.com/image.jpg"
+              />
+              <p className="text-xs text-gray-500 mt-1">Enter full image URL</p>
+            </div>
+            
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="is_featured"
+                name="is_featured"
+                checked={currentImage.is_featured || false}
+                onChange={handleImageChange}
+                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+              />
+              <label htmlFor="is_featured" className="text-sm font-medium text-gray-700">
+                Featured Image
+              </label>
+            </div>
+            
+            <div className="pt-2">
+              <button 
+                type="submit"
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+              >
+                <SafeIcon icon={FiSave} />
+                {currentImage.id ? 'Update Image' : 'Save Image'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+      
+      {isLoading ? (
+        <p>Loading gallery images...</p>
+      ) : (
+        <div className="space-y-4">
+          {galleryImages.length === 0 ? (
+            <p className="text-gray-500">No gallery images added yet.</p>
+          ) : (
+            galleryImages.map((image, index) => (
+              <div key={image.id} className="bg-white p-4 rounded-lg shadow flex gap-4">
+                <div className="flex-shrink-0 w-40">
+                  <img 
+                    src={image.image_url}
+                    alt={image.alt_text}
+                    className="w-full h-24 object-cover rounded"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/160x96?text=Image';
+                    }}
+                  />
+                </div>
+                <div className="flex-grow">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium">{image.title}</h4>
+                    {image.is_featured && (
+                      <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                        Featured
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-600">{image.alt_text}</p>
+                </div>
+                <div className="flex-shrink-0 flex flex-col gap-2">
+                  <div className="flex gap-1">
+                    <button 
+                      onClick={() => moveImage(image.id, 'up')}
+                      disabled={index === 0}
+                      className={`p-2 ${index === 0 ? 'text-gray-300' : 'text-blue-600 hover:bg-blue-50'} rounded`}
+                    >
+                      <SafeIcon icon={FiArrowUp} />
+                    </button>
+                    <button 
+                      onClick={() => moveImage(image.id, 'down')}
+                      disabled={index === galleryImages.length - 1}
+                      className={`p-2 ${index === galleryImages.length - 1 ? 'text-gray-300' : 'text-blue-600 hover:bg-blue-50'} rounded`}
+                    >
+                      <SafeIcon icon={FiArrowDown} />
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => editImage(image)}
+                    className="p-2 text-blue-600 hover:bg-blue-50 rounded"
+                  >
+                    <SafeIcon icon={FiEdit} />
+                  </button>
+                  <button 
+                    onClick={() => deleteImage(image.id)}
+                    className="p-2 text-red-600 hover:bg-red-50 rounded"
+                  >
+                    <SafeIcon icon={FiTrash2} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
     </div>
   );
 
@@ -559,6 +881,9 @@ const AdminPage = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="Enter your reCAPTCHA site key"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Get your site key from <a href="https://www.google.com/recaptcha/admin" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">Google reCAPTCHA Admin</a>
+            </p>
           </div>
           
           <div>
@@ -571,7 +896,11 @@ const AdminPage = () => {
               onChange={(e) => setSettings({...settings, recaptcha_secret_key: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="Enter your reCAPTCHA secret key"
+              autoComplete="new-password"
             />
+            <p className="text-xs text-gray-500 mt-1">
+              This is used for server-side verification
+            </p>
           </div>
         </div>
         
@@ -630,6 +959,7 @@ const AdminPage = () => {
             
             <div className="flex-1 p-6">
               {activeTab === 'hero' && renderHeroTab()}
+              {activeTab === 'gallery' && renderGalleryTab()}
               {activeTab === 'videos' && renderVideosTab()}
               {activeTab === 'messages' && renderMessagesTab()}
               {activeTab === 'settings' && renderSettingsTab()}

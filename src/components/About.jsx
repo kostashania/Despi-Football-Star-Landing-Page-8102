@@ -6,6 +6,22 @@ import * as FiIcons from 'react-icons/fi';
 const { FiMapPin, FiCalendar, FiTrendingUp, FiHeart } = FiIcons;
 
 const About = () => {
+  // Calculate Despi's age dynamically based on her birthdate (02/04/2013)
+  const calculateAge = () => {
+    const birthDate = new Date('2013-04-02'); // YYYY-MM-DD format
+    const today = new Date();
+    
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDifference = today.getMonth() - birthDate.getMonth();
+    
+    // If birthday hasn't occurred yet this year, subtract 1 from age
+    if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
   const stats = [
     {
       icon: FiMapPin,
@@ -15,7 +31,7 @@ const About = () => {
     {
       icon: FiCalendar,
       label: 'Age',
-      value: '10 Years Old'
+      value: `${calculateAge()} Years Old`
     },
     {
       icon: FiTrendingUp,
@@ -68,11 +84,9 @@ const About = () => {
             <h3 className="text-3xl font-bold text-gray-900 mb-6">
               Rising Football Star
             </h3>
-            
             <p className="text-gray-600 leading-relaxed">
-              Despi (Δέσποινα Ασβεστά) is a remarkable young talent from Chania, Greece, who has been making headlines with her incredible football skills at just 10 years old. Her dedication to the sport and natural ability have caught the attention of football enthusiasts across Greece.
+              Despi (Δέσποινα Ασβεστά) is a remarkable young talent from Chania, Greece, who has been making headlines with her incredible football skills at just {calculateAge()} years old. Her dedication to the sport and natural ability have caught the attention of football enthusiasts across Greece.
             </p>
-            
             <p className="text-gray-600 leading-relaxed">
               Known for her amazing goals and technical abilities, Despi represents the future of women's football. Her passion for the game is evident in every match she plays, inspiring young girls everywhere to pursue their football dreams.
             </p>

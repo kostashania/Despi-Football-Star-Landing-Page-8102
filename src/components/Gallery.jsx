@@ -1,14 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
+import supabase from '../lib/supabase';
 
 const { FiX } = FiIcons;
 
 const Gallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
-
-  const images = [
+  const [images, setImages] = useState([
     {
       src: "https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962901891-blob",
       alt: "Despi in action",
@@ -39,7 +39,36 @@ const Gallery = () => {
       alt: "Skills training",
       title: "Skill Development"
     }
-  ];
+  ]);
+
+  useEffect(() => {
+    fetchGalleryImages();
+  }, []);
+
+  const fetchGalleryImages = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const formattedImages = data.map(image => ({
+          id: image.id,
+          src: image.image_url,
+          alt: image.alt_text,
+          title: image.title,
+          isFeatured: image.is_featured
+        }));
+        
+        setImages(formattedImages);
+      }
+    } catch (error) {
+      console.error('Error fetching gallery images:', error);
+    }
+  };
 
   return (
     <section id="gallery" className="py-20 bg-white">
@@ -61,7 +90,7 @@ const Gallery = () => {
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {images.map((image, index) => (
             <motion.div
-              key={index}
+              key={image.id || index}
               initial={{ opacity: 0, scale: 0.8 }}
               whileInView={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
