@@ -11,7 +11,7 @@ import { validateImageUrl } from '../utils/imageUpload';
 const { 
   FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, 
   FiSettings, FiImage, FiArrowUp, FiArrowDown, FiUpload, FiExternalLink, FiLink,
-  FiCheck, FiClock, FiEye, FiMail
+  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar
 } = FiIcons;
 
 const AdminPage = () => {
@@ -129,37 +129,23 @@ const AdminPage = () => {
         if (error) throw error;
         setMessages(data || []);
       } else if (activeTab === 'settings') {
-        try {
-          await supabase.query(`
-            CREATE TABLE IF NOT EXISTS admin_settings_despi_9a7b3c4d2e (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              setting_key TEXT UNIQUE NOT NULL,
-              setting_value TEXT,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-            );
-          `);
+        const { data, error } = await supabase
+          .from('admin_settings_despi_9a7b3c4d2e')
+          .select('*');
 
-          const { data, error } = await supabase
-            .from('admin_settings_despi_9a7b3c4d2e')
-            .select('*');
+        if (error) throw error;
 
-          if (error) throw error;
+        const settingsObj = {};
+        (data || []).forEach(setting => {
+          settingsObj[setting.setting_key] = setting.setting_value;
+        });
 
-          const settingsObj = {};
-          (data || []).forEach(setting => {
-            settingsObj[setting.setting_key] = setting.setting_value;
-          });
-
-          setSettings({
-            recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
-            recaptcha_site_key: settingsObj.recaptcha_site_key || '',
-            recaptcha_secret_key: settingsObj.recaptcha_secret_key || '',
-            notification_emails: settingsObj.notification_emails || 'despihania@gmail.com'
-          });
-        } catch (error) {
-          console.error('Error fetching settings:', error);
-        }
+        setSettings({
+          recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
+          recaptcha_site_key: settingsObj.recaptcha_site_key || '',
+          recaptcha_secret_key: settingsObj.recaptcha_secret_key || '',
+          notification_emails: settingsObj.notification_emails || 'despihania@gmail.com'
+        });
       }
     } catch (error) {
       console.error(`Error fetching ${activeTab} data:`, error);
@@ -210,20 +196,6 @@ const AdminPage = () => {
 
   const saveSettings = async () => {
     try {
-      try {
-        await supabase.query(`
-          CREATE TABLE IF NOT EXISTS admin_settings_despi_9a7b3c4d2e (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            setting_key TEXT UNIQUE NOT NULL,
-            setting_value TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT now(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT now()
-          );
-        `);
-      } catch (error) {
-        console.error('Error ensuring admin_settings table exists:', error);
-      }
-
       const settingsToSave = [
         { setting_key: 'recaptcha_enabled', setting_value: settings.recaptcha_enabled.toString() },
         { setting_key: 'recaptcha_site_key', setting_value: settings.recaptcha_site_key },
@@ -257,6 +229,130 @@ const AdminPage = () => {
     } catch (error) {
       console.error('Error saving settings:', error);
       alert(`Error saving settings: ${error.message || 'Please try again.'}`);
+    }
+  };
+
+  const deleteGalleryImage = async (imageId) => {
+    if (!confirm('Are you sure you want to delete this image?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .delete()
+        .eq('id', imageId);
+
+      if (error) throw error;
+      
+      fetchData();
+      alert('Image deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting image:', error);
+      alert('Error deleting image. Please try again.');
+    }
+  };
+
+  const toggleImageFeatured = async (imageId, currentFeatured) => {
+    try {
+      const { error } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .update({ is_featured: !currentFeatured })
+        .eq('id', imageId);
+
+      if (error) throw error;
+      
+      fetchData();
+    } catch (error) {
+      console.error('Error updating image:', error);
+      alert('Error updating image. Please try again.');
+    }
+  };
+
+  const addVideo = async () => {
+    if (!currentVideo.title || !currentVideo.url) {
+      alert('Please fill in title and URL');
+      return;
+    }
+
+    try {
+      const extractYoutubeId = (url) => {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+      };
+
+      const youtubeId = extractYoutubeId(currentVideo.url);
+      const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : '';
+
+      const { error } = await supabase
+        .from('videos_despi_9a7b3c4d2e')
+        .insert([{
+          ...currentVideo,
+          youtube_id: youtubeId,
+          thumbnail_url: thumbnailUrl,
+          created_at: new Date()
+        }]);
+
+      if (error) throw error;
+      
+      setCurrentVideo({ title: '', description: '', url: '', thumbnail_url: '' });
+      fetchData();
+      alert('Video added successfully!');
+    } catch (error) {
+      console.error('Error adding video:', error);
+      alert('Error adding video. Please try again.');
+    }
+  };
+
+  const deleteVideo = async (videoId) => {
+    if (!confirm('Are you sure you want to delete this video?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('videos_despi_9a7b3c4d2e')
+        .delete()
+        .eq('id', videoId);
+
+      if (error) throw error;
+      
+      fetchData();
+      alert('Video deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting video:', error);
+      alert('Error deleting video. Please try again.');
+    }
+  };
+
+  const markMessageAsRead = async (messageId) => {
+    try {
+      const { error } = await supabase
+        .from('contact_messages_despi_9a7b3c4d2e')
+        .update({ is_read: true })
+        .eq('id', messageId);
+
+      if (error) throw error;
+      
+      fetchData();
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+    }
+  };
+
+  const deleteMessage = async (messageId) => {
+    if (!confirm('Are you sure you want to delete this message?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('contact_messages_despi_9a7b3c4d2e')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) throw error;
+      
+      fetchData();
+      alert('Message deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      alert('Error deleting message. Please try again.');
     }
   };
 
@@ -324,6 +420,228 @@ const AdminPage = () => {
                       View
                     </a>
                   </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderGalleryTab = () => (
+    <div className="space-y-6">
+      <h3 className="text-xl font-semibold">Gallery Management</h3>
+      
+      {isLoading ? (
+        <p>Loading gallery images...</p>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {galleryImages.map((image) => (
+            <div key={image.id} className="bg-white p-4 rounded-lg shadow">
+              <div className="relative mb-3">
+                <img
+                  src={image.image_url}
+                  alt={image.alt_text}
+                  className="w-full h-32 object-cover rounded"
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/200x128?text=Image';
+                  }}
+                />
+                {image.is_featured && (
+                  <span className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                    <SafeIcon icon={FiStar} className="w-3 h-3 inline mr-1" />
+                    Featured
+                  </span>
+                )}
+              </div>
+              <h4 className="font-medium mb-2">{image.title}</h4>
+              <p className="text-sm text-gray-600 mb-3">{image.alt_text}</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => toggleImageFeatured(image.id, image.is_featured)}
+                  className={`px-3 py-1 text-xs rounded ${
+                    image.is_featured 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : 'bg-gray-100 text-gray-600'
+                  }`}
+                >
+                  {image.is_featured ? 'Unfeature' : 'Feature'}
+                </button>
+                <button
+                  onClick={() => deleteGalleryImage(image.id)}
+                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderVideosTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-semibold">Video Management</h3>
+        <button
+          onClick={() => setIsEditing(!isEditing)}
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+        >
+          {isEditing ? 'Cancel' : 'Add Video'}
+        </button>
+      </div>
+
+      {isEditing && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h4 className="text-lg font-medium mb-4">Add New Video</h4>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+              <input
+                type="text"
+                value={currentVideo.title}
+                onChange={(e) => setCurrentVideo({ ...currentVideo, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Enter video title"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+              <textarea
+                value={currentVideo.description}
+                onChange={(e) => setCurrentVideo({ ...currentVideo, description: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                rows="3"
+                placeholder="Enter video description"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">YouTube URL</label>
+              <input
+                type="url"
+                value={currentVideo.url}
+                onChange={(e) => setCurrentVideo({ ...currentVideo, url: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={addVideo}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                Add Video
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <p>Loading videos...</p>
+      ) : (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {videos.map((video) => (
+            <div key={video.id} className="bg-white p-4 rounded-lg shadow">
+              <div className="relative mb-3">
+                <img
+                  src={video.thumbnail_url || 'https://via.placeholder.com/200x113?text=Video'}
+                  alt={video.title}
+                  className="w-full h-32 object-cover rounded"
+                />
+                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                  <SafeIcon icon={FiVideo} className="text-white w-8 h-8" />
+                </div>
+              </div>
+              <h4 className="font-medium mb-2">{video.title}</h4>
+              <p className="text-sm text-gray-600 mb-3">{video.description}</p>
+              <div className="flex gap-2">
+                <a
+                  href={video.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                >
+                  <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
+                  View
+                </a>
+                <button
+                  onClick={() => deleteVideo(video.id)}
+                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderMessagesTab = () => (
+    <div className="space-y-6">
+      <h3 className="text-xl font-semibold">Contact Messages</h3>
+      
+      {isLoading ? (
+        <p>Loading messages...</p>
+      ) : (
+        <div className="space-y-4">
+          {messages.length === 0 ? (
+            <p className="text-gray-500">No messages yet.</p>
+          ) : (
+            messages.map((message) => (
+              <div key={message.id} className={`bg-white p-4 rounded-lg shadow ${
+                !message.is_read ? 'border-l-4 border-blue-400' : ''
+              }`}>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="font-medium">{message.name}</h4>
+                    <p className="text-sm text-gray-600">{message.email}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(message.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {!message.is_read && (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                        New
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="text-gray-700 mb-3">{message.message}</p>
+                <div className="flex gap-2">
+                  <a
+                    href={`mailto:${message.email}`}
+                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1"
+                  >
+                    <SafeIcon icon={FiMail} className="w-3 h-3" />
+                    Reply
+                  </a>
+                  {!message.is_read && (
+                    <button
+                      onClick={() => markMessageAsRead(message.id)}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    >
+                      Mark as Read
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteMessage(message.id)}
+                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             ))
@@ -429,7 +747,6 @@ const AdminPage = () => {
     </div>
   );
 
-  // Keep existing render methods for other tabs...
   const renderHeroTab = () => (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold">Edit Hero Content</h3>
@@ -539,6 +856,11 @@ const AdminPage = () => {
                         {pendingImages.length}
                       </span>
                     )}
+                    {tab.id === 'messages' && messages.filter(m => !m.is_read).length > 0 && (
+                      <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-1 ml-auto">
+                        {messages.filter(m => !m.is_read).length}
+                      </span>
+                    )}
                   </button>
                 ))}
               </nav>
@@ -561,8 +883,10 @@ const AdminPage = () => {
             <div className="flex-1 p-6">
               {activeTab === 'pending' && renderPendingTab()}
               {activeTab === 'hero' && renderHeroTab()}
+              {activeTab === 'gallery' && renderGalleryTab()}
+              {activeTab === 'videos' && renderVideosTab()}
+              {activeTab === 'messages' && renderMessagesTab()}
               {activeTab === 'settings' && renderSettingsTab()}
-              {/* Add other existing render methods here */}
             </div>
           </div>
         </div>
