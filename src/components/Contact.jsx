@@ -35,7 +35,61 @@ const Contact = () => {
 
   useEffect(() => {
     fetchSettings();
+    ensureContactTable();
   }, []);
+
+  const ensureContactTable = async () => {
+    try {
+      // Check if the table exists
+      const { data, error } = await supabase
+        .from('contact_messages_despi_9a7b3c4d2e')
+        .select('id')
+        .limit(1);
+      
+      if (error && error.code === 'PGRST116') {
+        console.log("Contact messages table doesn't exist. Creating it...");
+        
+        // Create table with proper RLS
+        const createTableQuery = `
+          CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            message TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          
+          -- Enable Row Level Security
+          ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+          
+          -- Create policies for authenticated users (admins)
+          CREATE POLICY "Allow select for authenticated users" 
+            ON contact_messages_despi_9a7b3c4d2e FOR SELECT 
+            USING (auth.role() = 'authenticated');
+            
+          CREATE POLICY "Allow update for authenticated users" 
+            ON contact_messages_despi_9a7b3c4d2e FOR UPDATE 
+            USING (auth.role() = 'authenticated')
+            WITH CHECK (auth.role() = 'authenticated');
+            
+          CREATE POLICY "Allow delete for authenticated users" 
+            ON contact_messages_despi_9a7b3c4d2e FOR DELETE 
+            USING (auth.role() = 'authenticated');
+          
+          -- Create policy for anonymous users to insert messages
+          CREATE POLICY "Allow insert for anonymous users" 
+            ON contact_messages_despi_9a7b3c4d2e FOR INSERT 
+            WITH CHECK (true);
+        `;
+        
+        await supabase.rpc('execute_sql', { query: createTableQuery });
+        console.log("Contact messages table created successfully!");
+      }
+    } catch (error) {
+      console.error("Error ensuring contact table exists:", error);
+    }
+  };
 
   const fetchSettings = async () => {
     try {
@@ -99,50 +153,27 @@ const Contact = () => {
         }
       }
 
-      // First, check if the table exists
-      const { data: tableCheck, error: tableCheckError } = await supabase
-        .from('contact_messages_despi_9a7b3c4d2e')
-        .select('id')
-        .limit(1);
+      console.log("Submitting message:", form);
 
-      // If the table doesn't exist, create it
-      if (tableCheckError && tableCheckError.code === 'PGRST116') {
-        const createTableQuery = `
-          CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            message TEXT NOT NULL,
-            is_read BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-          CREATE POLICY "Allow all operations for authenticated users" ON contact_messages_despi_9a7b3c4d2e 
-            USING (auth.role() = 'authenticated')
-            WITH CHECK (auth.role() = 'authenticated');
-          CREATE POLICY "Allow insert for anonymous users" ON contact_messages_despi_9a7b3c4d2e 
-            FOR INSERT WITH CHECK (true);
-        `;
-        
-        await supabase.rpc('execute_sql', { query: createTableQuery });
-      }
-
-      // Insert the new message
-      const { error } = await supabase
+      // Insert the new message directly
+      const { data, error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
         .insert([
           {
             name: form.name,
             email: form.email,
             message: form.message,
-            is_read: false,
-            created_at: new Date()
+            is_read: false
           }
-        ]);
+        ])
+        .select();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Insert error:", error);
+        throw error;
+      }
 
-      console.log("Message submitted successfully!");
+      console.log("Message submitted successfully:", data);
       setSubmitSuccess(true);
       setForm({ name: '', email: '', message: '' });
 
@@ -156,9 +187,14 @@ const Contact = () => {
       setTimeout(() => {
         setSubmitSuccess(false);
       }, 5000);
+      
+      // Send notification email (This is just for display - it won't actually work in the browser environment)
+      // In a production environment, you would use a serverless function or backend service
+      console.log("Would send notification email to admin");
+      
     } catch (error) {
       console.error('Error submitting form:', error);
-      setErrorMessage('There was a problem submitting your message. Please try again. Error: ' + error.message);
+      setErrorMessage('There was a problem submitting your message. Please try again. Error: ' + (error.message || error));
     } finally {
       setIsSubmitting(false);
     }

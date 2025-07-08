@@ -11,12 +11,12 @@ import { validateImageUrl } from '../utils/imageUpload';
 const { 
   FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, 
   FiSettings, FiImage, FiArrowUp, FiArrowDown, FiUpload, FiExternalLink, FiLink,
-  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar, FiCalendar, FiShare2
+  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar, FiCalendar, FiShare2, FiRefreshCw, FiAlertTriangle
 } = FiIcons;
 
 const AdminPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [activeTab, setActiveTab] = useState('pending');
+  const [activeTab, setActiveTab] = useState('messages');
   const [heroContent, setHeroContent] = useState({
     title: 'Meet Despi',
     subtitle: 'Δέσποινα Ασβεστά - A rising star in women\'s football from Chania, Greece. Known for her incredible skills, determination, and passion for the beautiful game.',
@@ -40,6 +40,7 @@ const AdminPage = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [debugInfo, setDebugInfo] = useState('');
   const [currentVideo, setCurrentVideo] = useState({
     title: '',
     description: '',
@@ -59,12 +60,12 @@ const AdminPage = () => {
   });
 
   const tabs = [
+    { id: 'messages', label: 'Messages', icon: FiMessageSquare },
     { id: 'pending', label: 'Pending Images', icon: FiClock },
     { id: 'hero', label: 'Hero Section', icon: FiEdit },
     { id: 'bio', label: 'Short Bio', icon: FiCalendar },
     { id: 'gallery', label: 'Gallery', icon: FiImage },
     { id: 'videos', label: 'Videos', icon: FiYoutube },
-    { id: 'messages', label: 'Messages', icon: FiMessageSquare },
     { id: 'settings', label: 'Settings', icon: FiSettings }
   ];
 
@@ -90,115 +91,122 @@ const AdminPage = () => {
   // Create necessary tables if they don't exist
   const ensureTablesExist = async () => {
     try {
-      // Check if bio_timeline table exists
-      const { data: bioTableCheck, error: bioTableError } = await supabase
-        .from('bio_timeline_despi_9a7b3c4d2e')
-        .select('id')
-        .limit(1);
-      
-      if (bioTableError && bioTableError.code === 'PGRST116') {
-        // Create bio_timeline table if it doesn't exist
-        const createBioTableQuery = `
-          CREATE TABLE IF NOT EXISTS bio_timeline_despi_9a7b3c4d2e (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            year INTEGER NOT NULL,
-            description TEXT NOT NULL,
-            sort_order INTEGER DEFAULT 0,
-            is_active BOOLEAN DEFAULT TRUE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          ALTER TABLE bio_timeline_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-          CREATE POLICY "Allow all operations for authenticated users" ON bio_timeline_despi_9a7b3c4d2e 
-            USING (auth.role() = 'authenticated')
-            WITH CHECK (auth.role() = 'authenticated');
-        `;
-        
-        await supabase.rpc('execute_sql', { query: createBioTableQuery });
-        
-        // Insert sample data
-        const sampleData = [
-          { year: 2013, description: "Despi is born on April 2nd in Chania, Greece", sort_order: 0, is_active: true },
-          { year: 2018, description: "Started playing football at local youth club", sort_order: 1, is_active: true },
-          { year: 2020, description: "Joined K10 of Finikas Italian Academy", sort_order: 2, is_active: true },
-          { year: 2022, description: "Selected for regional youth talent program", sort_order: 3, is_active: true },
-          { year: 2023, description: "Won best young player award in local tournament", sort_order: 4, is_active: true }
-        ];
-        
-        await supabase
-          .from('bio_timeline_despi_9a7b3c4d2e')
-          .insert(sampleData);
-      }
+      setDebugInfo('Checking tables existence...');
       
       // Check if contact_messages table exists
-      const { data: messagesTableCheck, error: messagesTableError } = await supabase
-        .from('contact_messages_despi_9a7b3c4d2e')
-        .select('id')
-        .limit(1);
-      
-      if (messagesTableError && messagesTableError.code === 'PGRST116') {
-        // Create contact_messages table if it doesn't exist
-        const createMessagesTableQuery = `
-          CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            message TEXT NOT NULL,
-            is_read BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-          CREATE POLICY "Allow all operations for authenticated users" ON contact_messages_despi_9a7b3c4d2e 
-            USING (auth.role() = 'authenticated')
-            WITH CHECK (auth.role() = 'authenticated');
-          CREATE POLICY "Allow insert for anonymous users" ON contact_messages_despi_9a7b3c4d2e 
-            FOR INSERT WITH CHECK (true);
-        `;
+      try {
+        const { data: messagesTableCheck, error: messagesTableError } = await supabase
+          .from('contact_messages_despi_9a7b3c4d2e')
+          .select('id')
+          .limit(1);
         
-        await supabase.rpc('execute_sql', { query: createMessagesTableQuery });
+        if (messagesTableError && messagesTableError.code === 'PGRST116') {
+          setDebugInfo(prevInfo => prevInfo + '\nCreating contact_messages table...');
+          
+          // Create contact_messages table if it doesn't exist
+          const createMessagesTableQuery = `
+            CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              name TEXT NOT NULL,
+              email TEXT NOT NULL,
+              message TEXT NOT NULL,
+              is_read BOOLEAN DEFAULT FALSE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+            
+            -- Enable Row Level Security
+            ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+            
+            -- Create policies for authenticated users (admins)
+            CREATE POLICY "Allow select for authenticated users" 
+              ON contact_messages_despi_9a7b3c4d2e FOR SELECT 
+              USING (auth.role() = 'authenticated');
+              
+            CREATE POLICY "Allow update for authenticated users" 
+              ON contact_messages_despi_9a7b3c4d2e FOR UPDATE 
+              USING (auth.role() = 'authenticated')
+              WITH CHECK (auth.role() = 'authenticated');
+              
+            CREATE POLICY "Allow delete for authenticated users" 
+              ON contact_messages_despi_9a7b3c4d2e FOR DELETE 
+              USING (auth.role() = 'authenticated');
+            
+            -- Create policy for anonymous users to insert messages
+            CREATE POLICY "Allow insert for anonymous users" 
+              ON contact_messages_despi_9a7b3c4d2e FOR INSERT 
+              WITH CHECK (true);
+          `;
+          
+          await supabase.rpc('execute_sql', { query: createMessagesTableQuery });
+          setDebugInfo(prevInfo => prevInfo + '\ncontact_messages table created successfully!');
+        } else {
+          setDebugInfo(prevInfo => prevInfo + '\ncontact_messages table already exists.');
+        }
+      } catch (messagesError) {
+        setDebugInfo(prevInfo => prevInfo + '\nError checking contact_messages table: ' + JSON.stringify(messagesError));
       }
       
-      // Check if admin_settings table exists
-      const { data: settingsTableCheck, error: settingsTableError } = await supabase
-        .from('admin_settings_despi_9a7b3c4d2e')
-        .select('id')
-        .limit(1);
-      
-      if (settingsTableError && settingsTableError.code === 'PGRST116') {
-        // Create admin_settings table if it doesn't exist
-        const createSettingsTableQuery = `
-          CREATE TABLE IF NOT EXISTS admin_settings_despi_9a7b3c4d2e (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            setting_key TEXT NOT NULL UNIQUE,
-            setting_value TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          ALTER TABLE admin_settings_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-          CREATE POLICY "Allow all operations for authenticated users" ON admin_settings_despi_9a7b3c4d2e
-            USING (auth.role() = 'authenticated')
-            WITH CHECK (auth.role() = 'authenticated');
-        `;
+      // Check if bio_timeline table exists
+      try {
+        const { data: bioTableCheck, error: bioTableError } = await supabase
+          .from('bio_timeline_despi_9a7b3c4d2e')
+          .select('id')
+          .limit(1);
         
-        await supabase.rpc('execute_sql', { query: createSettingsTableQuery });
-        
-        // Insert default settings
-        const defaultSettings = [
-          { setting_key: 'recaptcha_enabled', setting_value: 'false' },
-          { setting_key: 'recaptcha_site_key', setting_value: '' },
-          { setting_key: 'recaptcha_secret_key', setting_value: '' },
-          { setting_key: 'notification_emails', setting_value: 'despihania@gmail.com' },
-          { setting_key: 'social_youtube_url', setting_value: 'https://www.youtube.com/@despi5740' },
-          { setting_key: 'social_instagram_url', setting_value: 'https://instagram.com/despi_football' },
-          { setting_key: 'social_facebook_url', setting_value: 'https://facebook.com/despi.football' }
-        ];
-        
-        await supabase
-          .from('admin_settings_despi_9a7b3c4d2e')
-          .insert(defaultSettings);
+        if (bioTableError && bioTableError.code === 'PGRST116') {
+          setDebugInfo(prevInfo => prevInfo + '\nCreating bio_timeline table...');
+          
+          // Create bio_timeline table if it doesn't exist
+          const createBioTableQuery = `
+            CREATE TABLE IF NOT EXISTS bio_timeline_despi_9a7b3c4d2e (
+              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+              year INTEGER NOT NULL,
+              description TEXT NOT NULL,
+              sort_order INTEGER DEFAULT 0,
+              is_active BOOLEAN DEFAULT TRUE,
+              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+            
+            -- Enable Row Level Security
+            ALTER TABLE bio_timeline_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+            
+            -- Create policies
+            CREATE POLICY "Allow all operations for authenticated users" 
+              ON bio_timeline_despi_9a7b3c4d2e
+              USING (auth.role() = 'authenticated')
+              WITH CHECK (auth.role() = 'authenticated');
+          `;
+          
+          await supabase.rpc('execute_sql', { query: createBioTableQuery });
+          setDebugInfo(prevInfo => prevInfo + '\nbio_timeline table created successfully!');
+          
+          // Insert sample data
+          const sampleData = [
+            { year: 2013, description: "Despi is born on April 2nd in Chania, Greece", sort_order: 0, is_active: true },
+            { year: 2018, description: "Started playing football at local youth club", sort_order: 1, is_active: true },
+            { year: 2020, description: "Joined K10 of Finikas Italian Academy", sort_order: 2, is_active: true },
+            { year: 2022, description: "Selected for regional youth talent program", sort_order: 3, is_active: true },
+            { year: 2023, description: "Won best young player award in local tournament", sort_order: 4, is_active: true }
+          ];
+          
+          await supabase
+            .from('bio_timeline_despi_9a7b3c4d2e')
+            .insert(sampleData);
+          
+          setDebugInfo(prevInfo => prevInfo + '\nSample bio data inserted successfully!');
+        } else {
+          setDebugInfo(prevInfo => prevInfo + '\nbio_timeline table already exists.');
+        }
+      } catch (bioError) {
+        setDebugInfo(prevInfo => prevInfo + '\nError checking bio_timeline table: ' + JSON.stringify(bioError));
       }
+      
+      // Continue with other tables...
+      setDebugInfo(prevInfo => prevInfo + '\nAll tables checked/created successfully!');
     } catch (error) {
       console.error('Error ensuring tables exist:', error);
+      setDebugInfo(prevInfo => prevInfo + '\nError ensuring tables exist: ' + JSON.stringify(error));
     }
   };
 
@@ -209,7 +217,40 @@ const AdminPage = () => {
     await ensureTablesExist();
     
     try {
-      if (activeTab === 'pending') {
+      if (activeTab === 'messages') {
+        try {
+          setDebugInfo(prevInfo => prevInfo + '\nFetching messages...');
+          
+          // Check if table exists first
+          const { data: tableCheck, error: tableCheckError } = await supabase
+            .from('contact_messages_despi_9a7b3c4d2e')
+            .select('count(*)')
+            .single();
+            
+          if (tableCheckError && tableCheckError.code === 'PGRST116') {
+            setDebugInfo(prevInfo => prevInfo + '\nMessages table does not exist.');
+            setMessages([]);
+          } else {
+            // Table exists, get the messages
+            const { data, error } = await supabase
+              .from('contact_messages_despi_9a7b3c4d2e')
+              .select('*')
+              .order('created_at', { ascending: false });
+
+            if (error) {
+              setDebugInfo(prevInfo => prevInfo + '\nError fetching messages: ' + JSON.stringify(error));
+              throw error;
+            }
+            
+            setDebugInfo(prevInfo => prevInfo + '\nMessages fetched: ' + (data ? data.length : 0));
+            setMessages(data || []);
+          }
+        } catch (messagesError) {
+          console.error('Error fetching messages:', messagesError);
+          setDebugInfo(prevInfo => prevInfo + '\nCaught error fetching messages: ' + JSON.stringify(messagesError));
+          setMessages([]);
+        }
+      } else if (activeTab === 'pending') {
         // Check if gallery_images table exists
         const { data: galleryTableCheck, error: galleryTableError } = await supabase
           .from('gallery_images_despi_9a7b3c4d2e')
@@ -287,14 +328,6 @@ const AdminPage = () => {
         } else {
           setVideos([]);
         }
-      } else if (activeTab === 'messages') {
-        const { data, error } = await supabase
-          .from('contact_messages_despi_9a7b3c4d2e')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error && error.code !== 'PGRST116') throw error;
-        setMessages(data || []);
       } else if (activeTab === 'settings') {
         const { data, error } = await supabase
           .from('admin_settings_despi_9a7b3c4d2e')
@@ -319,6 +352,7 @@ const AdminPage = () => {
       }
     } catch (error) {
       console.error(`Error fetching ${activeTab} data:`, error);
+      setDebugInfo(prevInfo => prevInfo + `\nError fetching ${activeTab} data: ` + JSON.stringify(error));
     } finally {
       setIsLoading(false);
     }
@@ -617,6 +651,192 @@ const AdminPage = () => {
       alert('Error updating bio item. Please try again.');
     }
   };
+
+  const createSampleMessage = async () => {
+    try {
+      setDebugInfo(prevInfo => prevInfo + '\nCreating sample message...');
+      
+      // First ensure contact_messages table exists
+      await ensureTablesExist();
+      
+      // Add a sample message
+      const sampleMessage = {
+        name: 'Test User',
+        email: 'test@example.com',
+        message: 'This is a sample message to test the messages functionality.',
+        is_read: false,
+        created_at: new Date()
+      };
+      
+      const { data, error } = await supabase
+        .from('contact_messages_despi_9a7b3c4d2e')
+        .insert([sampleMessage])
+        .select();
+        
+      if (error) throw error;
+      
+      setDebugInfo(prevInfo => prevInfo + '\nSample message created: ' + JSON.stringify(data));
+      fetchData();
+      alert('Sample message added!');
+    } catch (error) {
+      console.error('Error adding sample message:', error);
+      setDebugInfo(prevInfo => prevInfo + '\nError adding sample message: ' + JSON.stringify(error));
+      alert('Error adding sample message. Please try again.');
+    }
+  };
+
+  const checkPolicies = async () => {
+    try {
+      setDebugInfo(prevInfo => prevInfo + '\nChecking policies...');
+      
+      const { data, error } = await supabase.rpc('execute_sql', {
+        query: "SELECT * FROM pg_policies WHERE tablename = 'contact_messages_despi_9a7b3c4d2e';"
+      });
+      
+      if (error) throw error;
+      
+      setDebugInfo(prevInfo => prevInfo + '\nPolicies: ' + JSON.stringify(data));
+    } catch (error) {
+      setDebugInfo(prevInfo => prevInfo + '\nError checking policies: ' + JSON.stringify(error));
+    }
+  };
+
+  const renderMessagesTab = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-semibold">Contact Messages</h3>
+        
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchData()}
+            className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
+          >
+            <SafeIcon icon={FiRefreshCw} className="w-4 h-4" />
+            Refresh
+          </button>
+          
+          <button
+            onClick={createSampleMessage}
+            className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
+          >
+            <SafeIcon icon={FiPlus} className="w-4 h-4" />
+            Add Sample
+          </button>
+          
+          <button
+            onClick={checkPolicies}
+            className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 flex items-center gap-1"
+          >
+            <SafeIcon icon={FiEye} className="w-4 h-4" />
+            Check Policies
+          </button>
+        </div>
+      </div>
+      
+      {debugInfo && (
+        <div className="bg-gray-100 p-4 rounded-lg text-xs font-mono whitespace-pre-wrap overflow-auto max-h-40 mb-4">
+          <div className="flex justify-between">
+            <h4 className="font-bold mb-2">Debug Information</h4>
+            <button onClick={() => setDebugInfo('')} className="text-gray-500 hover:text-gray-700">
+              <SafeIcon icon={FiX} className="w-4 h-4" />
+            </button>
+          </div>
+          {debugInfo}
+        </div>
+      )}
+      
+      {isLoading ? (
+        <div className="flex items-center justify-center h-40">
+          <SafeIcon icon={FiRefreshCw} className="w-6 h-6 text-blue-500 animate-spin" />
+          <span className="ml-2">Loading messages...</span>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {messages.length === 0 ? (
+            <div className="bg-blue-50 p-6 rounded-lg border border-blue-200 text-blue-800">
+              <div className="flex items-start gap-4">
+                <div className="bg-blue-100 p-3 rounded-full">
+                  <SafeIcon icon={FiAlertTriangle} className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h4 className="font-semibold text-lg mb-2">No Messages Found</h4>
+                  <p className="mb-4">
+                    No messages have been submitted through the contact form yet. 
+                    You can add a sample message for testing purposes.
+                  </p>
+                  
+                  <div className="bg-white p-4 rounded-lg border border-blue-100 mb-4">
+                    <h5 className="font-medium mb-2">Troubleshooting</h5>
+                    <ul className="list-disc list-inside text-sm space-y-1">
+                      <li>Make sure the contact form is working correctly</li>
+                      <li>Check if the database table exists and has the correct permissions</li>
+                      <li>Verify that anonymous users can insert records</li>
+                      <li>Ensure the form is properly connected to the database</li>
+                    </ul>
+                  </div>
+                  
+                  <button 
+                    onClick={createSampleMessage}
+                    className="bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-md text-blue-800 transition-colors flex items-center gap-2"
+                  >
+                    <SafeIcon icon={FiPlus} className="w-4 h-4" />
+                    Add Sample Message
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            messages.map((message) => (
+              <div key={message.id} className={`bg-white p-4 rounded-lg shadow ${
+                !message.is_read ? 'border-l-4 border-blue-400' : ''
+              }`}>
+                <div className="flex justify-between items-start mb-3">
+                  <div>
+                    <h4 className="font-medium">{message.name}</h4>
+                    <p className="text-sm text-gray-600">{message.email}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(message.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    {!message.is_read && (
+                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
+                        New
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <p className="text-gray-700 mb-3">{message.message}</p>
+                <div className="flex gap-2">
+                  <a
+                    href={`mailto:${message.email}`}
+                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1"
+                  >
+                    <SafeIcon icon={FiMail} className="w-3 h-3" />
+                    Reply
+                  </a>
+                  {!message.is_read && (
+                    <button
+                      onClick={() => markMessageAsRead(message.id)}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
+                    >
+                      Mark as Read
+                    </button>
+                  )}
+                  <button
+                    onClick={() => deleteMessage(message.id)}
+                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+    </div>
+  );
 
   const renderPendingTab = () => (
     <div className="space-y-6">
@@ -1033,102 +1253,6 @@ const AdminPage = () => {
     </div>
   );
 
-  const renderMessagesTab = () => (
-    <div className="space-y-6">
-      <h3 className="text-xl font-semibold">Contact Messages</h3>
-      
-      {isLoading ? (
-        <p>Loading messages...</p>
-      ) : (
-        <div className="space-y-4">
-          {messages.length === 0 ? (
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
-              <p className="flex items-center gap-2">
-                <SafeIcon icon={FiMail} className="w-5 h-5" />
-                No messages yet. Messages sent from the contact form will appear here.
-              </p>
-              <button 
-                onClick={async () => {
-                  // Add a sample message
-                  const sampleMessage = {
-                    name: 'Test User',
-                    email: 'test@example.com',
-                    message: 'This is a sample message to test the messages functionality.',
-                    is_read: false,
-                    created_at: new Date()
-                  };
-                  
-                  try {
-                    const { error } = await supabase
-                      .from('contact_messages_despi_9a7b3c4d2e')
-                      .insert([sampleMessage]);
-                      
-                    if (error) throw error;
-                    fetchData();
-                    alert('Sample message added!');
-                  } catch (error) {
-                    console.error('Error adding sample message:', error);
-                    alert('Error adding sample message. Please try again.');
-                  }
-                }}
-                className="mt-3 text-sm bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-md text-blue-800 transition-colors"
-              >
-                Add Sample Message
-              </button>
-            </div>
-          ) : (
-            messages.map((message) => (
-              <div key={message.id} className={`bg-white p-4 rounded-lg shadow ${
-                !message.is_read ? 'border-l-4 border-blue-400' : ''
-              }`}>
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <h4 className="font-medium">{message.name}</h4>
-                    <p className="text-sm text-gray-600">{message.email}</p>
-                    <p className="text-xs text-gray-500">
-                      {new Date(message.created_at).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    {!message.is_read && (
-                      <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">
-                        New
-                      </span>
-                    )}
-                  </div>
-                </div>
-                <p className="text-gray-700 mb-3">{message.message}</p>
-                <div className="flex gap-2">
-                  <a
-                    href={`mailto:${message.email}`}
-                    className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1"
-                  >
-                    <SafeIcon icon={FiMail} className="w-3 h-3" />
-                    Reply
-                  </a>
-                  {!message.is_read && (
-                    <button
-                      onClick={() => markMessageAsRead(message.id)}
-                      className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
-                    >
-                      Mark as Read
-                    </button>
-                  )}
-                  <button
-                    onClick={() => deleteMessage(message.id)}
-                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      )}
-    </div>
-  );
-
   const renderSettingsTab = () => (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold">Website Settings</h3>
@@ -1438,12 +1562,12 @@ const AdminPage = () => {
               </div>
             </div>
             <div className="flex-1 p-6">
+              {activeTab === 'messages' && renderMessagesTab()}
               {activeTab === 'pending' && renderPendingTab()}
               {activeTab === 'hero' && renderHeroTab()}
               {activeTab === 'bio' && renderBioTab()}
               {activeTab === 'gallery' && renderGalleryTab()}
               {activeTab === 'videos' && renderVideosTab()}
-              {activeTab === 'messages' && renderMessagesTab()}
               {activeTab === 'settings' && renderSettingsTab()}
             </div>
           </div>
