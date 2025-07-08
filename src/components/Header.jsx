@@ -27,9 +27,13 @@ const Header = () => {
         <div className="flex justify-between items-center">
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="text-2xl font-bold text-green-600"
+            className="flex items-center"
           >
-            Despi
+            <img 
+              src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png" 
+              alt="Despi Logo" 
+              className="h-10 mr-2"
+            />
           </motion.div>
 
           {/* Desktop Navigation */}

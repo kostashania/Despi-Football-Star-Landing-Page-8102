@@ -1,11 +1,21 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
+import supabase from '../lib/supabase';
 
-const { FiMail, FiPhone, FiMapPin, FiYoutube, FiInstagram, FiTwitter } = FiIcons;
+const { FiMail, FiPhone, FiMapPin, FiYoutube, FiInstagram, FiTwitter, FiCheck } = FiIcons;
 
 const Contact = () => {
+  const [form, setForm] = useState({
+    name: '',
+    email: '',
+    message: ''
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+
   const contactInfo = [
     {
       icon: FiMapPin,
@@ -29,6 +39,48 @@ const Contact = () => {
     { icon: FiInstagram, href: '#', label: 'Instagram' },
     { icon: FiTwitter, href: '#', label: 'Twitter' }
   ];
+
+  const handleChange = (e) => {
+    setForm({
+      ...form,
+      [e.target.name]: e.target.value
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setErrorMessage('');
+    
+    try {
+      const { error } = await supabase
+        .from('contact_messages_despi_9a7b3c4d2e')
+        .insert([
+          { 
+            name: form.name,
+            email: form.email,
+            message: form.message,
+            created_at: new Date()
+          }
+        ]);
+        
+      if (error) throw error;
+      
+      setSubmitSuccess(true);
+      setForm({ name: '', email: '', message: '' });
+      
+      // Reset success message after 5 seconds
+      setTimeout(() => {
+        setSubmitSuccess(false);
+      }, 5000);
+      
+    } catch (error) {
+      console.error('Error submitting form:', error);
+      setErrorMessage('There was a problem submitting your message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <section id="contact" className="py-20 bg-white">
@@ -108,13 +160,34 @@ const Contact = () => {
               Send a Message
             </h3>
             
-            <form className="space-y-6">
+            {submitSuccess ? (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-green-100 p-4 rounded-lg flex items-center gap-3 mb-6"
+              >
+                <SafeIcon icon={FiCheck} className="text-green-600 w-5 h-5" />
+                <p className="text-green-800">Thank you! Your message has been sent successfully.</p>
+              </motion.div>
+            ) : null}
+            
+            {errorMessage ? (
+              <div className="bg-red-100 p-4 rounded-lg text-red-800 mb-6">
+                {errorMessage}
+              </div>
+            ) : null}
+            
+            <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Name
                 </label>
                 <input
                   type="text"
+                  name="name"
+                  value={form.name}
+                  onChange={handleChange}
+                  required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="Your name"
                 />
@@ -126,6 +199,10 @@ const Contact = () => {
                 </label>
                 <input
                   type="email"
+                  name="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="Your email"
                 />
@@ -137,6 +214,10 @@ const Contact = () => {
                 </label>
                 <textarea
                   rows="4"
+                  name="message"
+                  value={form.message}
+                  onChange={handleChange}
+                  required
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="Your message"
                 ></textarea>
@@ -144,9 +225,10 @@ const Contact = () => {
               
               <button
                 type="submit"
-                className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 transition-colors"
+                disabled={isSubmitting}
+                className={`w-full ${isSubmitting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white py-3 rounded-lg font-medium transition-colors relative`}
               >
-                Send Message
+                {isSubmitting ? 'Sending...' : 'Send Message'}
               </button>
             </form>
           </motion.div>

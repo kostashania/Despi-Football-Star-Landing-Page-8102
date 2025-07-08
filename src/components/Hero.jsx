@@ -1,11 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
+import supabase from '../lib/supabase';
 
 const { FiPlay, FiStar, FiTarget } = FiIcons;
 
 const Hero = () => {
+  const [heroData, setHeroData] = useState({
+    title: 'Meet Despi',
+    subtitle: 'Δέσποινα Ασβεστά - A rising star in women\'s football from Chania, Greece. Known for her incredible skills, determination, and passion for the beautiful game.',
+    buttonText: 'Watch Highlights',
+    buttonLink: '#videos'
+  });
+
+  useEffect(() => {
+    const fetchHeroData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('hero_content_despi_9a7b3c4d2e')
+          .select('*')
+          .limit(1)
+          .single();
+          
+        if (error) throw error;
+        if (data) setHeroData(data);
+      } catch (error) {
+        console.error('Error fetching hero data:', error);
+      }
+    };
+
+    fetchHeroData();
+  }, []);
+
   return (
     <section id="home" className="pt-20 pb-16 min-h-screen flex items-center">
       <div className="container mx-auto px-4">
@@ -15,14 +42,25 @@ const Hero = () => {
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
           >
+            <div className="mb-6">
+              <img 
+                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png" 
+                alt="Despi Logo" 
+                className="h-24 object-contain"
+              />
+            </div>
+            
             <motion.h1
               className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.2 }}
             >
-              Meet{' '}
-              <span className="text-green-600">Despi</span>
+              {heroData.title.split(' ').map((word, index) => (
+                <span key={index} className={index === 1 ? "text-green-600" : ""}>
+                  {word}{' '}
+                </span>
+              ))}
             </motion.h1>
             
             <motion.p
@@ -31,8 +69,7 @@ const Hero = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
             >
-              Δέσποινα Ασβεστά - A rising star in women's football from Chania, Greece. 
-              Known for her incredible skills, determination, and passion for the beautiful game.
+              {heroData.subtitle}
             </motion.p>
 
             <motion.div
@@ -57,12 +94,12 @@ const Hero = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <button className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-colors">
-                Watch Highlights
-              </button>
-              <button className="border-2 border-green-600 text-green-600 px-8 py-3 rounded-full font-medium hover:bg-green-600 hover:text-white transition-colors">
+              <a href={heroData.buttonLink} className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-colors">
+                {heroData.buttonText}
+              </a>
+              <a href="#about" className="border-2 border-green-600 text-green-600 px-8 py-3 rounded-full font-medium hover:bg-green-600 hover:text-white transition-colors">
                 Learn More
-              </button>
+              </a>
             </motion.div>
           </motion.div>
 
@@ -74,7 +111,7 @@ const Hero = () => {
           >
             <div className="relative z-10">
               <img
-                src="https://images.unsplash.com/photo-1551698618-1dfe5d97d256?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80"
+                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959485547-blob"
                 alt="Despi Football Player"
                 className="rounded-2xl shadow-2xl w-full h-[600px] object-cover"
               />

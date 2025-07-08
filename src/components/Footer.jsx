@@ -23,7 +23,13 @@ const Footer = () => {
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
           >
-            <h3 className="text-2xl font-bold mb-4">Despi</h3>
+            <div className="flex items-center mb-4">
+              <img 
+                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png" 
+                alt="Despi Logo" 
+                className="h-12 mr-2 filter brightness-0 invert"
+              />
+            </div>
             <p className="text-gray-400 mb-4">
               Following the journey of a rising football star from Chania, Greece.
             </p>
