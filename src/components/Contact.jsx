@@ -92,13 +92,42 @@ const Contact = () => {
     setErrorMessage('');
 
     try {
-      // If reCAPTCHA is enabled, verify it
+      // Check if reCAPTCHA is enabled and verify it
       if (recaptchaSettings.enabled && recaptchaSettings.siteKey) {
         if (!recaptchaValue) {
           throw new Error('Please complete the reCAPTCHA verification');
         }
       }
 
+      // First, check if the table exists
+      const { data: tableCheck, error: tableCheckError } = await supabase
+        .from('contact_messages_despi_9a7b3c4d2e')
+        .select('id')
+        .limit(1);
+
+      // If the table doesn't exist, create it
+      if (tableCheckError && tableCheckError.code === 'PGRST116') {
+        const createTableQuery = `
+          CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            message TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY "Allow all operations for authenticated users" ON contact_messages_despi_9a7b3c4d2e 
+            USING (auth.role() = 'authenticated')
+            WITH CHECK (auth.role() = 'authenticated');
+          CREATE POLICY "Allow insert for anonymous users" ON contact_messages_despi_9a7b3c4d2e 
+            FOR INSERT WITH CHECK (true);
+        `;
+        
+        await supabase.rpc('execute_sql', { query: createTableQuery });
+      }
+
+      // Insert the new message
       const { error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
         .insert([
@@ -106,18 +135,21 @@ const Contact = () => {
             name: form.name,
             email: form.email,
             message: form.message,
+            is_read: false,
             created_at: new Date()
           }
         ]);
 
       if (error) throw error;
 
+      console.log("Message submitted successfully!");
       setSubmitSuccess(true);
       setForm({ name: '', email: '', message: '' });
 
-      // Reset reCAPTCHA
+      // Reset reCAPTCHA if enabled
       if (recaptchaSettings.enabled && window.grecaptcha) {
         window.grecaptcha.reset();
+        setRecaptchaValue(null);
       }
 
       // Reset success message after 5 seconds
@@ -126,7 +158,7 @@ const Contact = () => {
       }, 5000);
     } catch (error) {
       console.error('Error submitting form:', error);
-      setErrorMessage('There was a problem submitting your message. Please try again.');
+      setErrorMessage('There was a problem submitting your message. Please try again. Error: ' + error.message);
     } finally {
       setIsSubmitting(false);
     }

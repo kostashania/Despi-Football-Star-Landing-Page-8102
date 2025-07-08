@@ -87,18 +87,147 @@ const AdminPage = () => {
     setIsLoggedIn(false);
   };
 
+  // Create necessary tables if they don't exist
+  const ensureTablesExist = async () => {
+    try {
+      // Check if bio_timeline table exists
+      const { data: bioTableCheck, error: bioTableError } = await supabase
+        .from('bio_timeline_despi_9a7b3c4d2e')
+        .select('id')
+        .limit(1);
+      
+      if (bioTableError && bioTableError.code === 'PGRST116') {
+        // Create bio_timeline table if it doesn't exist
+        const createBioTableQuery = `
+          CREATE TABLE IF NOT EXISTS bio_timeline_despi_9a7b3c4d2e (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            year INTEGER NOT NULL,
+            description TEXT NOT NULL,
+            sort_order INTEGER DEFAULT 0,
+            is_active BOOLEAN DEFAULT TRUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          ALTER TABLE bio_timeline_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY "Allow all operations for authenticated users" ON bio_timeline_despi_9a7b3c4d2e 
+            USING (auth.role() = 'authenticated')
+            WITH CHECK (auth.role() = 'authenticated');
+        `;
+        
+        await supabase.rpc('execute_sql', { query: createBioTableQuery });
+        
+        // Insert sample data
+        const sampleData = [
+          { year: 2013, description: "Despi is born on April 2nd in Chania, Greece", sort_order: 0, is_active: true },
+          { year: 2018, description: "Started playing football at local youth club", sort_order: 1, is_active: true },
+          { year: 2020, description: "Joined K10 of Finikas Italian Academy", sort_order: 2, is_active: true },
+          { year: 2022, description: "Selected for regional youth talent program", sort_order: 3, is_active: true },
+          { year: 2023, description: "Won best young player award in local tournament", sort_order: 4, is_active: true }
+        ];
+        
+        await supabase
+          .from('bio_timeline_despi_9a7b3c4d2e')
+          .insert(sampleData);
+      }
+      
+      // Check if contact_messages table exists
+      const { data: messagesTableCheck, error: messagesTableError } = await supabase
+        .from('contact_messages_despi_9a7b3c4d2e')
+        .select('id')
+        .limit(1);
+      
+      if (messagesTableError && messagesTableError.code === 'PGRST116') {
+        // Create contact_messages table if it doesn't exist
+        const createMessagesTableQuery = `
+          CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            message TEXT NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY "Allow all operations for authenticated users" ON contact_messages_despi_9a7b3c4d2e 
+            USING (auth.role() = 'authenticated')
+            WITH CHECK (auth.role() = 'authenticated');
+          CREATE POLICY "Allow insert for anonymous users" ON contact_messages_despi_9a7b3c4d2e 
+            FOR INSERT WITH CHECK (true);
+        `;
+        
+        await supabase.rpc('execute_sql', { query: createMessagesTableQuery });
+      }
+      
+      // Check if admin_settings table exists
+      const { data: settingsTableCheck, error: settingsTableError } = await supabase
+        .from('admin_settings_despi_9a7b3c4d2e')
+        .select('id')
+        .limit(1);
+      
+      if (settingsTableError && settingsTableError.code === 'PGRST116') {
+        // Create admin_settings table if it doesn't exist
+        const createSettingsTableQuery = `
+          CREATE TABLE IF NOT EXISTS admin_settings_despi_9a7b3c4d2e (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            setting_key TEXT NOT NULL UNIQUE,
+            setting_value TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          ALTER TABLE admin_settings_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY "Allow all operations for authenticated users" ON admin_settings_despi_9a7b3c4d2e
+            USING (auth.role() = 'authenticated')
+            WITH CHECK (auth.role() = 'authenticated');
+        `;
+        
+        await supabase.rpc('execute_sql', { query: createSettingsTableQuery });
+        
+        // Insert default settings
+        const defaultSettings = [
+          { setting_key: 'recaptcha_enabled', setting_value: 'false' },
+          { setting_key: 'recaptcha_site_key', setting_value: '' },
+          { setting_key: 'recaptcha_secret_key', setting_value: '' },
+          { setting_key: 'notification_emails', setting_value: 'despihania@gmail.com' },
+          { setting_key: 'social_youtube_url', setting_value: 'https://www.youtube.com/@despi5740' },
+          { setting_key: 'social_instagram_url', setting_value: 'https://instagram.com/despi_football' },
+          { setting_key: 'social_facebook_url', setting_value: 'https://facebook.com/despi.football' }
+        ];
+        
+        await supabase
+          .from('admin_settings_despi_9a7b3c4d2e')
+          .insert(defaultSettings);
+      }
+    } catch (error) {
+      console.error('Error ensuring tables exist:', error);
+    }
+  };
+
   const fetchData = async () => {
     setIsLoading(true);
+    
+    // First ensure all necessary tables exist
+    await ensureTablesExist();
+    
     try {
       if (activeTab === 'pending') {
-        const { data, error } = await supabase
+        // Check if gallery_images table exists
+        const { data: galleryTableCheck, error: galleryTableError } = await supabase
           .from('gallery_images_despi_9a7b3c4d2e')
-          .select('*')
-          .eq('is_approved', false)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setPendingImages(data || []);
+          .select('id')
+          .limit(1);
+        
+        if (!galleryTableError) {
+          const { data, error } = await supabase
+            .from('gallery_images_despi_9a7b3c4d2e')
+            .select('*')
+            .eq('is_approved', false)
+            .order('created_at', { ascending: false });
+  
+          if (error) throw error;
+          setPendingImages(data || []);
+        } else {
+          setPendingImages([]);
+        }
       } else if (activeTab === 'hero') {
         const { data, error } = await supabase
           .from('hero_content_despi_9a7b3c4d2e')
@@ -114,44 +243,64 @@ const AdminPage = () => {
           .select('*')
           .order('sort_order', { ascending: true });
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error;
         setBioTimeline(data || []);
       } else if (activeTab === 'gallery') {
-        const { data, error } = await supabase
+        // Check if gallery_images table exists
+        const { data: galleryTableCheck, error: galleryTableError } = await supabase
           .from('gallery_images_despi_9a7b3c4d2e')
-          .select('*')
-          .eq('is_approved', true)
-          .order('sort_order', { ascending: true });
-
-        if (error) throw error;
-        setGalleryImages(data || []);
+          .select('id')
+          .limit(1);
+        
+        if (!galleryTableError) {
+          const { data, error } = await supabase
+            .from('gallery_images_despi_9a7b3c4d2e')
+            .select('*')
+            .eq('is_approved', true)
+            .order('sort_order', { ascending: true });
+  
+          if (error) throw error;
+          setGalleryImages(data || []);
+        } else {
+          setGalleryImages([]);
+        }
       } else if (activeTab === 'videos') {
-        const { data, error } = await supabase
+        // Check if videos table exists
+        const { data: videosTableCheck, error: videosTableError } = await supabase
           .from('videos_despi_9a7b3c4d2e')
-          .select('*')
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        const filteredVideos = (data || []).filter(video => 
-          !video.title.toLowerCase().includes('music') && 
-          !video.description.toLowerCase().includes('music') && 
-          video.youtube_id !== 'dQw4w9WgXcQ'
-        );
-        setVideos(filteredVideos);
+          .select('id')
+          .limit(1);
+        
+        if (!videosTableError) {
+          const { data, error } = await supabase
+            .from('videos_despi_9a7b3c4d2e')
+            .select('*')
+            .order('created_at', { ascending: false });
+  
+          if (error) throw error;
+          const filteredVideos = (data || []).filter(video => 
+            !video.title.toLowerCase().includes('music') && 
+            !video.description.toLowerCase().includes('music') && 
+            video.youtube_id !== 'dQw4w9WgXcQ'
+          );
+          setVideos(filteredVideos);
+        } else {
+          setVideos([]);
+        }
       } else if (activeTab === 'messages') {
         const { data, error } = await supabase
           .from('contact_messages_despi_9a7b3c4d2e')
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error;
         setMessages(data || []);
       } else if (activeTab === 'settings') {
         const { data, error } = await supabase
           .from('admin_settings_despi_9a7b3c4d2e')
           .select('*');
 
-        if (error) throw error;
+        if (error && error.code !== 'PGRST116') throw error;
 
         const settingsObj = {};
         (data || []).forEach(setting => {
@@ -307,6 +456,33 @@ const AdminPage = () => {
       const youtubeId = extractYoutubeId(currentVideo.url);
       const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : '';
 
+      // Check if videos table exists
+      const { data: videosTableCheck, error: videosTableError } = await supabase
+        .from('videos_despi_9a7b3c4d2e')
+        .select('id')
+        .limit(1);
+      
+      if (videosTableError && videosTableError.code === 'PGRST116') {
+        // Create videos table if it doesn't exist
+        const createVideosTableQuery = `
+          CREATE TABLE IF NOT EXISTS videos_despi_9a7b3c4d2e (
+            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+            title TEXT NOT NULL,
+            description TEXT,
+            url TEXT NOT NULL,
+            youtube_id TEXT,
+            thumbnail_url TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          );
+          ALTER TABLE videos_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+          CREATE POLICY "Allow all operations for authenticated users" ON videos_despi_9a7b3c4d2e
+            USING (auth.role() = 'authenticated')
+            WITH CHECK (auth.role() = 'authenticated');
+        `;
+        
+        await supabase.rpc('execute_sql', { query: createVideosTableQuery });
+      }
+
       const { error } = await supabase
         .from('videos_despi_9a7b3c4d2e')
         .insert([{
@@ -391,6 +567,7 @@ const AdminPage = () => {
         .from('bio_timeline_despi_9a7b3c4d2e')
         .insert([{
           ...currentBioItem,
+          is_active: true,
           created_at: new Date(),
           updated_at: new Date()
         }]);
@@ -586,7 +763,39 @@ const AdminPage = () => {
       ) : (
         <div className="space-y-4">
           {bioTimeline.length === 0 ? (
-            <p className="text-gray-500">No bio items yet.</p>
+            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-yellow-800">
+              <p className="flex items-center gap-2">
+                <SafeIcon icon={FiClock} className="w-5 h-5" />
+                No bio items yet. Add your first bio item using the "Add Bio Item" button above.
+              </p>
+              <button 
+                onClick={() => {
+                  // Add sample bio items
+                  const sampleData = [
+                    { year: 2013, description: "Despi is born on April 2nd in Chania, Greece", sort_order: 0, is_active: true },
+                    { year: 2018, description: "Started playing football at local youth club", sort_order: 1, is_active: true },
+                    { year: 2020, description: "Joined K10 of Finikas Italian Academy", sort_order: 2, is_active: true },
+                    { year: 2022, description: "Selected for regional youth talent program", sort_order: 3, is_active: true },
+                    { year: 2023, description: "Won best young player award in local tournament", sort_order: 4, is_active: true }
+                  ];
+                  
+                  Promise.all(sampleData.map(item => 
+                    supabase
+                      .from('bio_timeline_despi_9a7b3c4d2e')
+                      .insert([item])
+                  )).then(() => {
+                    fetchData();
+                    alert('Sample bio items added successfully!');
+                  }).catch(error => {
+                    console.error('Error adding sample bio items:', error);
+                    alert('Error adding sample bio items. Please try again.');
+                  });
+                }}
+                className="mt-3 text-sm bg-yellow-100 hover:bg-yellow-200 px-4 py-2 rounded-md text-yellow-800 transition-colors"
+              >
+                Add Sample Bio Items
+              </button>
+            </div>
           ) : (
             bioTimeline.map((item) => (
               <div key={item.id} className={`bg-white p-4 rounded-lg shadow ${
@@ -644,46 +853,52 @@ const AdminPage = () => {
         <p>Loading gallery images...</p>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {galleryImages.map((image) => (
-            <div key={image.id} className="bg-white p-4 rounded-lg shadow">
-              <div className="relative mb-3">
-                <img
-                  src={image.image_url}
-                  alt={image.alt_text}
-                  className="w-full h-32 object-cover rounded"
-                  onError={(e) => {
-                    e.target.src = 'https://via.placeholder.com/200x128?text=Image';
-                  }}
-                />
-                {image.is_featured && (
-                  <span className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-                    <SafeIcon icon={FiStar} className="w-3 h-3 inline mr-1" />
-                    Featured
-                  </span>
-                )}
-              </div>
-              <h4 className="font-medium mb-2">{image.title}</h4>
-              <p className="text-sm text-gray-600 mb-3">{image.alt_text}</p>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => toggleImageFeatured(image.id, image.is_featured)}
-                  className={`px-3 py-1 text-xs rounded ${
-                    image.is_featured 
-                      ? 'bg-yellow-100 text-yellow-800' 
-                      : 'bg-gray-100 text-gray-600'
-                  }`}
-                >
-                  {image.is_featured ? 'Unfeature' : 'Feature'}
-                </button>
-                <button
-                  onClick={() => deleteGalleryImage(image.id)}
-                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
+          {galleryImages.length === 0 ? (
+            <div className="col-span-full bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
+              <p>No gallery images yet. Approve user-uploaded images or add your own.</p>
             </div>
-          ))}
+          ) : (
+            galleryImages.map((image) => (
+              <div key={image.id} className="bg-white p-4 rounded-lg shadow">
+                <div className="relative mb-3">
+                  <img
+                    src={image.image_url}
+                    alt={image.alt_text}
+                    className="w-full h-32 object-cover rounded"
+                    onError={(e) => {
+                      e.target.src = 'https://via.placeholder.com/200x128?text=Image';
+                    }}
+                  />
+                  {image.is_featured && (
+                    <span className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                      <SafeIcon icon={FiStar} className="w-3 h-3 inline mr-1" />
+                      Featured
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-medium mb-2">{image.title}</h4>
+                <p className="text-sm text-gray-600 mb-3">{image.alt_text}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => toggleImageFeatured(image.id, image.is_featured)}
+                    className={`px-3 py-1 text-xs rounded ${
+                      image.is_featured 
+                        ? 'bg-yellow-100 text-yellow-800' 
+                        : 'bg-gray-100 text-gray-600'
+                    }`}
+                  >
+                    {image.is_featured ? 'Unfeature' : 'Feature'}
+                  </button>
+                  <button
+                    onClick={() => deleteGalleryImage(image.id)}
+                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
     </div>
@@ -757,39 +972,62 @@ const AdminPage = () => {
         <p>Loading videos...</p>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {videos.map((video) => (
-            <div key={video.id} className="bg-white p-4 rounded-lg shadow">
-              <div className="relative mb-3">
-                <img
-                  src={video.thumbnail_url || 'https://via.placeholder.com/200x113?text=Video'}
-                  alt={video.title}
-                  className="w-full h-32 object-cover rounded"
-                />
-                <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                  <SafeIcon icon={FiVideo} className="text-white w-8 h-8" />
+          {videos.length === 0 ? (
+            <div className="col-span-full bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
+              <p>No videos yet. Add your first video using the "Add Video" button above.</p>
+              <button 
+                onClick={() => {
+                  // Add a sample video
+                  const sampleVideo = {
+                    title: 'Amazing Skills Showcase',
+                    description: 'Watch Despi demonstrate her incredible football skills and techniques',
+                    url: 'https://www.youtube.com/watch?v=6sfCZhgX5jA',
+                  };
+                  
+                  // Set the current video data
+                  setCurrentVideo(sampleVideo);
+                  setIsEditing(true);
+                }}
+                className="mt-3 text-sm bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-md text-blue-800 transition-colors"
+              >
+                Add Sample Video
+              </button>
+            </div>
+          ) : (
+            videos.map((video) => (
+              <div key={video.id} className="bg-white p-4 rounded-lg shadow">
+                <div className="relative mb-3">
+                  <img
+                    src={video.thumbnail_url || 'https://via.placeholder.com/200x113?text=Video'}
+                    alt={video.title}
+                    className="w-full h-32 object-cover rounded"
+                  />
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <SafeIcon icon={FiVideo} className="text-white w-8 h-8" />
+                  </div>
+                </div>
+                <h4 className="font-medium mb-2">{video.title}</h4>
+                <p className="text-sm text-gray-600 mb-3">{video.description}</p>
+                <div className="flex gap-2">
+                  <a
+                    href={video.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                  >
+                    <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
+                    View
+                  </a>
+                  <button
+                    onClick={() => deleteVideo(video.id)}
+                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
-              <h4 className="font-medium mb-2">{video.title}</h4>
-              <p className="text-sm text-gray-600 mb-3">{video.description}</p>
-              <div className="flex gap-2">
-                <a
-                  href={video.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
-                >
-                  <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
-                  View
-                </a>
-                <button
-                  onClick={() => deleteVideo(video.id)}
-                  className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       )}
     </div>
@@ -804,7 +1042,40 @@ const AdminPage = () => {
       ) : (
         <div className="space-y-4">
           {messages.length === 0 ? (
-            <p className="text-gray-500">No messages yet.</p>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
+              <p className="flex items-center gap-2">
+                <SafeIcon icon={FiMail} className="w-5 h-5" />
+                No messages yet. Messages sent from the contact form will appear here.
+              </p>
+              <button 
+                onClick={async () => {
+                  // Add a sample message
+                  const sampleMessage = {
+                    name: 'Test User',
+                    email: 'test@example.com',
+                    message: 'This is a sample message to test the messages functionality.',
+                    is_read: false,
+                    created_at: new Date()
+                  };
+                  
+                  try {
+                    const { error } = await supabase
+                      .from('contact_messages_despi_9a7b3c4d2e')
+                      .insert([sampleMessage]);
+                      
+                    if (error) throw error;
+                    fetchData();
+                    alert('Sample message added!');
+                  } catch (error) {
+                    console.error('Error adding sample message:', error);
+                    alert('Error adding sample message. Please try again.');
+                  }
+                }}
+                className="mt-3 text-sm bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-md text-blue-800 transition-colors"
+              >
+                Add Sample Message
+              </button>
+            </div>
           ) : (
             messages.map((message) => (
               <div key={message.id} className={`bg-white p-4 rounded-lg shadow ${
@@ -1043,30 +1314,65 @@ const AdminPage = () => {
         <button
           onClick={async () => {
             try {
+              // Check if hero_content table exists
+              const { data: heroTableCheck, error: heroTableError } = await supabase
+                .from('hero_content_despi_9a7b3c4d2e')
+                .select('id')
+                .limit(1);
+                
+              if (heroTableError && heroTableError.code === 'PGRST116') {
+                // Create hero_content table if it doesn't exist
+                const createHeroTableQuery = `
+                  CREATE TABLE IF NOT EXISTS hero_content_despi_9a7b3c4d2e (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    title TEXT NOT NULL,
+                    subtitle TEXT,
+                    buttonText TEXT,
+                    buttonLink TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                  );
+                  ALTER TABLE hero_content_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
+                  CREATE POLICY "Allow all operations for authenticated users" ON hero_content_despi_9a7b3c4d2e
+                    USING (auth.role() = 'authenticated')
+                    WITH CHECK (auth.role() = 'authenticated');
+                `;
+                
+                await supabase.rpc('execute_sql', { query: createHeroTableQuery });
+              }
+
               const { data: existingData, error: checkError } = await supabase
                 .from('hero_content_despi_9a7b3c4d2e')
                 .select('id')
                 .limit(1);
 
-              if (checkError) throw checkError;
+              if (checkError && checkError.code !== 'PGRST116') throw checkError;
 
               let result;
               if (existingData && existingData.length > 0) {
                 result = await supabase
                   .from('hero_content_despi_9a7b3c4d2e')
-                  .update(heroContent)
+                  .update({
+                    ...heroContent,
+                    updated_at: new Date()
+                  })
                   .eq('id', existingData[0].id);
               } else {
                 result = await supabase
                   .from('hero_content_despi_9a7b3c4d2e')
-                  .insert([heroContent]);
+                  .insert([{
+                    ...heroContent,
+                    created_at: new Date(),
+                    updated_at: new Date()
+                  }]);
               }
 
               if (result.error) throw result.error;
+              
               alert('Hero content saved successfully!');
             } catch (error) {
               console.error('Error saving hero content:', error);
-              alert('Error saving hero content. Please try again.');
+              alert('Error saving hero content. Please try again. Error: ' + error.message);
             }
           }}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"

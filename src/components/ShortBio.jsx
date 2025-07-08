@@ -33,7 +33,7 @@ const ShortBio = () => {
 
   if (isLoading) {
     return (
-      <section className="py-20 bg-gray-50">
+      <section id="bio" className="py-20 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center">
             <div className="animate-pulse">
@@ -47,11 +47,29 @@ const ShortBio = () => {
   }
 
   if (!bioTimeline || bioTimeline.length === 0) {
-    return null;
+    return (
+      <section id="bio" className="py-20 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <motion.div
+            initial={{ opacity: 0, y: 50 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8 }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-4xl lg:text-5xl font-bold text-gray-900 mb-6">
+              Short Bio
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Key milestones in Despi's football journey will appear here soon.
+            </p>
+          </motion.div>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <section className="py-20 bg-gray-50">
+    <section id="bio" className="py-20 bg-gray-50">
       <div className="container mx-auto px-4">
         <motion.div
           initial={{ opacity: 0, y: 50 }}
