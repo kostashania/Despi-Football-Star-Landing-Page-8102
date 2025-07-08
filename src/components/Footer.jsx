@@ -9,22 +9,23 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   const socialLinks = [
-    {
-      icon: FiYoutube,
-      href: 'https://www.youtube.com/@despi5740',
-      label: 'YouTube'
-    },
-    {
-      icon: FiInstagram,
-      href: '#',
-      label: 'Instagram'
-    },
-    {
-      icon: FiTwitter,
-      href: '#',
-      label: 'Twitter'
-    }
+    { icon: FiYoutube, href: 'https://www.youtube.com/@despi5740', label: 'YouTube' },
+    { icon: FiInstagram, href: '#', label: 'Instagram' },
+    { icon: FiTwitter, href: '#', label: 'Twitter' }
   ];
+
+  const handleNavClick = (href) => {
+    const element = document.querySelector(href);
+    if (element) {
+      const headerHeight = 80;
+      const elementPosition = element.offsetTop - headerHeight;
+      
+      window.scrollTo({
+        top: elementPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   return (
     <footer className="bg-gray-900 text-white py-12">
@@ -36,9 +37,9 @@ const Footer = () => {
             transition={{ duration: 0.8 }}
           >
             <div className="flex items-center mb-4">
-              <img 
-                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png" 
-                alt="Despi Logo" 
+              <img
+                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png"
+                alt="Despi Logo"
                 className="h-12 mr-2 filter brightness-0 invert"
               />
             </div>
@@ -71,12 +72,54 @@ const Footer = () => {
           >
             <h4 className="text-xl font-bold mb-4">Quick Links</h4>
             <ul className="space-y-2">
-              <li><a href="#home" className="text-gray-400 hover:text-white transition-colors">Home</a></li>
-              <li><a href="#about" className="text-gray-400 hover:text-white transition-colors">About</a></li>
-              <li><a href="#skills" className="text-gray-400 hover:text-white transition-colors">Skills</a></li>
-              <li><a href="#gallery" className="text-gray-400 hover:text-white transition-colors">Gallery</a></li>
-              <li><a href="#videos" className="text-gray-400 hover:text-white transition-colors">Videos</a></li>
-              <li><a href="#contact" className="text-gray-400 hover:text-white transition-colors">Contact</a></li>
+              <li>
+                <button 
+                  onClick={() => handleNavClick('#home')}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Home
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleNavClick('#about')}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  About
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleNavClick('#skills')}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Skills
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleNavClick('#gallery')}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Gallery
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleNavClick('#videos')}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Videos
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => handleNavClick('#contact')}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  Contact
+                </button>
+              </li>
             </ul>
           </motion.div>
 

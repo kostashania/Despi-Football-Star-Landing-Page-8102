@@ -17,6 +17,22 @@ const Header = () => {
     { name: 'Contact', href: '#contact' }
   ];
 
+  const handleNavClick = (href) => {
+    setIsMenuOpen(false);
+    
+    // Smooth scroll to section
+    const element = document.querySelector(href);
+    if (element) {
+      const headerHeight = 80; // Account for fixed header
+      const elementPosition = element.offsetTop - headerHeight;
+      
+      window.scrollTo({
+        top: elementPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
+
   return (
     <motion.header
       initial={{ y: -100 }}
@@ -27,11 +43,12 @@ const Header = () => {
         <div className="flex justify-between items-center">
           <motion.div
             whileHover={{ scale: 1.05 }}
-            className="flex items-center"
+            className="flex items-center cursor-pointer"
+            onClick={() => handleNavClick('#home')}
           >
-            <img 
-              src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png" 
-              alt="Despi Logo" 
+            <img
+              src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png"
+              alt="Despi Logo"
               className="h-10 mr-2"
             />
           </motion.div>
@@ -39,14 +56,14 @@ const Header = () => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex space-x-8">
             {navItems.map((item) => (
-              <motion.a
+              <motion.button
                 key={item.name}
-                href={item.href}
+                onClick={() => handleNavClick(item.href)}
                 whileHover={{ scale: 1.1 }}
                 className="text-gray-700 hover:text-green-600 transition-colors font-medium"
               >
                 {item.name}
-              </motion.a>
+              </motion.button>
             ))}
           </nav>
 
@@ -70,14 +87,13 @@ const Header = () => {
             className="md:hidden mt-4 pb-4"
           >
             {navItems.map((item) => (
-              <a
+              <button
                 key={item.name}
-                href={item.href}
-                className="block py-2 text-gray-700 hover:text-green-600 transition-colors"
-                onClick={() => setIsMenuOpen(false)}
+                onClick={() => handleNavClick(item.href)}
+                className="block w-full text-left py-2 text-gray-700 hover:text-green-600 transition-colors"
               >
                 {item.name}
-              </a>
+              </button>
             ))}
           </motion.nav>
         )}

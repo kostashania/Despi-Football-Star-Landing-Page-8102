@@ -22,7 +22,7 @@ const Hero = () => {
           .select('*')
           .limit(1)
           .single();
-          
+
         if (error) throw error;
         if (data) setHeroData(data);
       } catch (error) {
@@ -32,6 +32,19 @@ const Hero = () => {
 
     fetchHeroData();
   }, []);
+
+  const handleButtonClick = (href) => {
+    const element = document.querySelector(href);
+    if (element) {
+      const headerHeight = 80;
+      const elementPosition = element.offsetTop - headerHeight;
+      
+      window.scrollTo({
+        top: elementPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   return (
     <section id="home" className="pt-20 pb-16 min-h-screen flex items-center">
@@ -43,13 +56,13 @@ const Hero = () => {
             transition={{ duration: 0.8 }}
           >
             <div className="mb-6">
-              <img 
-                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png" 
-                alt="Despi Logo" 
+              <img
+                src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751959468570-Despi2.png"
+                alt="Despi Logo"
                 className="h-24 object-contain"
               />
             </div>
-            
+
             <motion.h1
               className="text-5xl lg:text-7xl font-bold text-gray-900 mb-6"
               initial={{ opacity: 0, y: 20 }}
@@ -62,7 +75,7 @@ const Hero = () => {
                 </span>
               ))}
             </motion.h1>
-            
+
             <motion.p
               className="text-xl text-gray-600 mb-8 leading-relaxed"
               initial={{ opacity: 0, y: 20 }}
@@ -94,12 +107,18 @@ const Hero = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.8 }}
             >
-              <a href={heroData.buttonLink} className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-colors">
+              <button
+                onClick={() => handleButtonClick(heroData.buttonLink)}
+                className="bg-green-600 text-white px-8 py-3 rounded-full font-medium hover:bg-green-700 transition-colors"
+              >
                 {heroData.buttonText}
-              </a>
-              <a href="#about" className="border-2 border-green-600 text-green-600 px-8 py-3 rounded-full font-medium hover:bg-green-600 hover:text-white transition-colors">
+              </button>
+              <button
+                onClick={() => handleButtonClick('#about')}
+                className="border-2 border-green-600 text-green-600 px-8 py-3 rounded-full font-medium hover:bg-green-600 hover:text-white transition-colors"
+              >
                 Learn More
-              </a>
+              </button>
             </motion.div>
           </motion.div>
 
@@ -117,7 +136,7 @@ const Hero = () => {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-green-900/20 to-transparent rounded-2xl"></div>
             </div>
-            
+
             {/* Floating elements */}
             <motion.div
               animate={{ y: [0, -10, 0] }}
@@ -126,7 +145,7 @@ const Hero = () => {
             >
               <SafeIcon icon={FiPlay} className="text-green-600 w-6 h-6" />
             </motion.div>
-            
+
             <motion.div
               animate={{ y: [0, 10, 0] }}
               transition={{ duration: 2, repeat: Infinity, delay: 1 }}

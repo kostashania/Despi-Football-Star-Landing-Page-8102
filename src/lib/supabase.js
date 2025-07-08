@@ -66,6 +66,22 @@ const createRequiredTables = async () => {
       DROP POLICY IF EXISTS "Enable all operations for all users" ON gallery_images_despi_9a7b3c4d2e;
       CREATE POLICY "Enable all operations for all users" ON gallery_images_despi_9a7b3c4d2e USING (true);
     `).catch(() => {});
+
+    // Create storage bucket for image uploads if it doesn't exist
+    try {
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const bucketExists = buckets?.some(bucket => bucket.name === 'despi-gallery');
+      
+      if (!bucketExists) {
+        await supabase.storage.createBucket('despi-gallery', {
+          public: true,
+          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp', 'image/gif'],
+          fileSizeLimit: 5242880 // 5MB
+        });
+      }
+    } catch (error) {
+      console.error('Error creating storage bucket:', error);
+    }
     
   } catch (error) {
     console.error('Error initializing database:', error);

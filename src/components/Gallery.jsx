@@ -3,11 +3,13 @@ import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
 import supabase from '../lib/supabase';
+import ImageUploader from './ImageUploader';
 
-const { FiX } = FiIcons;
+const { FiX, FiUpload, FiPlus, FiImage } = FiIcons;
 
 const Gallery = () => {
   const [selectedImage, setSelectedImage] = useState(null);
+  const [showUploader, setShowUploader] = useState(false);
   const [images, setImages] = useState([
     {
       src: "https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962901891-blob",
@@ -62,11 +64,54 @@ const Gallery = () => {
           title: image.title,
           isFeatured: image.is_featured
         }));
-        
         setImages(formattedImages);
       }
     } catch (error) {
       console.error('Error fetching gallery images:', error);
+    }
+  };
+
+  const handleUploadSuccess = async (imageUrl) => {
+    try {
+      // Create a new image entry with default values
+      const newImage = {
+        title: 'New Upload',
+        alt_text: 'Uploaded football image',
+        image_url: imageUrl,
+        is_featured: false
+      };
+
+      // Get the next sort order
+      const { data: existingImages } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .select('sort_order')
+        .order('sort_order', { ascending: false })
+        .limit(1);
+
+      const nextSortOrder = existingImages && existingImages.length > 0 
+        ? existingImages[0].sort_order + 1 
+        : 0;
+
+      // Insert the new image
+      const { error } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .insert([{
+          ...newImage,
+          sort_order: nextSortOrder,
+          created_at: new Date(),
+          updated_at: new Date()
+        }]);
+
+      if (error) throw error;
+
+      // Refresh the gallery
+      fetchGalleryImages();
+      setShowUploader(false);
+      
+      alert('Image uploaded successfully!');
+    } catch (error) {
+      console.error('Error saving uploaded image:', error);
+      alert('Error saving uploaded image. Please try again.');
     }
   };
 
@@ -87,6 +132,60 @@ const Gallery = () => {
           </p>
         </motion.div>
 
+        {/* Upload Button for Public Users */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-8"
+        >
+          <button
+            onClick={() => setShowUploader(true)}
+            className="inline-flex items-center gap-2 bg-green-600 text-white px-6 py-3 rounded-full font-medium hover:bg-green-700 transition-colors"
+          >
+            <SafeIcon icon={FiUpload} className="w-5 h-5" />
+            Share Your Photo
+          </button>
+        </motion.div>
+
+        {/* Image Uploader Modal */}
+        {showUploader && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+            onClick={() => setShowUploader(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-bold text-gray-900">Share Your Photo</h3>
+                <button
+                  onClick={() => setShowUploader(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <SafeIcon icon={FiX} className="w-6 h-6" />
+                </button>
+              </div>
+              
+              <p className="text-gray-600 mb-6">
+                Share your photos of Despi's matches, training, or football moments!
+              </p>
+
+              <ImageUploader
+                onUploadSuccess={handleUploadSuccess}
+                onCancel={() => setShowUploader(false)}
+              />
+            </motion.div>
+          </motion.div>
+        )}
+
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {images.map((image, index) => (
             <motion.div
@@ -106,6 +205,11 @@ const Gallery = () => {
               <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                 <div className="absolute bottom-4 left-4 right-4">
                   <h3 className="text-white font-bold text-lg">{image.title}</h3>
+                  {image.isFeatured && (
+                    <span className="inline-block bg-green-600 text-white text-xs px-2 py-1 rounded-full mt-1">
+                      Featured
+                    </span>
+                  )}
                 </div>
               </div>
             </motion.div>
@@ -141,6 +245,11 @@ const Gallery = () => {
               </button>
               <div className="absolute bottom-4 left-4 right-4 text-center">
                 <h3 className="text-white font-bold text-xl">{selectedImage.title}</h3>
+                {selectedImage.isFeatured && (
+                  <span className="inline-block bg-green-600 text-white text-sm px-3 py-1 rounded-full mt-2">
+                    Featured Photo
+                  </span>
+                )}
               </div>
             </motion.div>
           </motion.div>
