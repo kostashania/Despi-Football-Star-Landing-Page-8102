@@ -13,18 +13,6 @@ const Videos = () => {
       title: 'Amazing Skills Showcase',
       description: 'Watch Despi demonstrate her incredible football skills and techniques',
       thumbnail: 'https://img.youtube.com/vi/6sfCZhgX5jA/maxresdefault.jpg'
-    },
-    {
-      id: 'dQw4w9WgXcQ',
-      title: 'Goal Compilation',
-      description: 'A compilation of Despi\'s most spectacular goals',
-      thumbnail: 'https://images.unsplash.com/photo-1551698618-1dfe5d97d256?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-    },
-    {
-      id: 'dQw4w9WgXcQ',
-      title: 'Training Session',
-      description: 'Behind the scenes look at Despi\'s training routine',
-      thumbnail: 'https://images.unsplash.com/photo-1574629810360-7efbbe195018?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
     }
   ]);
 
@@ -35,9 +23,18 @@ const Videos = () => {
           .from('videos_despi_9a7b3c4d2e')
           .select('*')
           .order('created_at', { ascending: false });
-          
+
         if (error) throw error;
-        if (data && data.length > 0) setVideos(data);
+        
+        if (data && data.length > 0) {
+          // Filter out unwanted videos and only show football-related content
+          const filteredVideos = data.filter(video => 
+            !video.title.toLowerCase().includes('music') &&
+            !video.description.toLowerCase().includes('music') &&
+            video.youtube_id !== 'dQw4w9WgXcQ'
+          );
+          setVideos(filteredVideos);
+        }
       } catch (error) {
         console.error('Error fetching videos:', error);
       }
@@ -78,7 +75,7 @@ const Videos = () => {
           {videos.map((video, index) => {
             const videoId = video.youtube_id || extractYoutubeId(video.url) || video.id;
             const thumbnailUrl = video.thumbnail_url || getYouTubeThumbnail(videoId);
-            
+
             return (
               <motion.div
                 key={videoId || index}
@@ -113,8 +110,7 @@ const Videos = () => {
                     onClick={() => window.open(video.url || `https://www.youtube.com/watch?v=${videoId}`, '_blank')}
                     className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
                   >
-                    Watch Video
-                    <SafeIcon icon={FiExternalLink} className="w-4 h-4" />
+                    Watch Video <SafeIcon icon={FiExternalLink} className="w-4 h-4" />
                   </button>
                 </div>
               </motion.div>

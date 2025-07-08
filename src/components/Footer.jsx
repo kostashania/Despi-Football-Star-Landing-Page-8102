@@ -9,9 +9,21 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
 
   const socialLinks = [
-    { icon: FiYoutube, href: 'https://www.youtube.com/@despi5740', label: 'YouTube' },
-    { icon: FiInstagram, href: '#', label: 'Instagram' },
-    { icon: FiTwitter, href: '#', label: 'Twitter' }
+    {
+      icon: FiYoutube,
+      href: 'https://www.youtube.com/@despi5740',
+      label: 'YouTube'
+    },
+    {
+      icon: FiInstagram,
+      href: '#',
+      label: 'Instagram'
+    },
+    {
+      icon: FiTwitter,
+      href: '#',
+      label: 'Twitter'
+    }
   ];
 
   return (
@@ -76,8 +88,8 @@ const Footer = () => {
             <h4 className="text-xl font-bold mb-4">Contact Info</h4>
             <div className="space-y-2 text-gray-400">
               <p>Chania, Greece</p>
-              <p>contact@despi-football.com</p>
-              <p>+30 XXX XXX XXXX</p>
+              <p>despihania@gmail.com</p>
+              <p>+30 698 414 6197 (Mr Kostas)</p>
             </div>
           </motion.div>
         </div>
@@ -89,8 +101,7 @@ const Footer = () => {
           className="border-t border-gray-800 mt-8 pt-8 text-center"
         >
           <p className="text-gray-400 flex items-center justify-center gap-2">
-            Made with <SafeIcon icon={FiHeart} className="text-red-500" /> for Despi
-            © {currentYear} All rights reserved.
+            Made with <SafeIcon icon={FiHeart} className="text-red-500" /> for Despi © {currentYear} All rights reserved.
           </p>
         </motion.div>
       </div>

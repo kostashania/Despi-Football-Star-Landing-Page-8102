@@ -15,6 +15,10 @@ const Contact = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [recaptchaSettings, setRecaptchaSettings] = useState({
+    enabled: false,
+    siteKey: ''
+  });
 
   const contactInfo = [
     {
@@ -25,20 +29,59 @@ const Contact = () => {
     {
       icon: FiMail,
       label: 'Email',
-      value: 'contact@despi-football.com'
+      value: 'despihania@gmail.com'
     },
     {
       icon: FiPhone,
       label: 'Phone',
-      value: '+30 XXX XXX XXXX'
+      value: '+30 698 414 6197 (Mr Kostas)'
     }
   ];
 
   const socialLinks = [
-    { icon: FiYoutube, href: 'https://www.youtube.com/@despi5740', label: 'YouTube' },
-    { icon: FiInstagram, href: '#', label: 'Instagram' },
-    { icon: FiTwitter, href: '#', label: 'Twitter' }
+    {
+      icon: FiYoutube,
+      href: 'https://www.youtube.com/@despi5740',
+      label: 'YouTube'
+    },
+    {
+      icon: FiInstagram,
+      href: '#',
+      label: 'Instagram'
+    },
+    {
+      icon: FiTwitter,
+      href: '#',
+      label: 'Twitter'
+    }
   ];
+
+  useEffect(() => {
+    fetchRecaptchaSettings();
+  }, []);
+
+  const fetchRecaptchaSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('admin_settings_despi_9a7b3c4d2e')
+        .select('*')
+        .in('setting_key', ['recaptcha_enabled', 'recaptcha_site_key']);
+
+      if (error) throw error;
+
+      const settings = {};
+      data.forEach(setting => {
+        settings[setting.setting_key] = setting.setting_value;
+      });
+
+      setRecaptchaSettings({
+        enabled: settings.recaptcha_enabled === 'true',
+        siteKey: settings.recaptcha_site_key || ''
+      });
+    } catch (error) {
+      console.error('Error fetching reCAPTCHA settings:', error);
+    }
+  };
 
   const handleChange = (e) => {
     setForm({
@@ -51,29 +94,35 @@ const Contact = () => {
     e.preventDefault();
     setIsSubmitting(true);
     setErrorMessage('');
-    
+
     try {
+      // If reCAPTCHA is enabled, verify it here
+      if (recaptchaSettings.enabled && recaptchaSettings.siteKey) {
+        // Add reCAPTCHA verification logic here
+        // For now, we'll skip this step
+      }
+
       const { error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
         .insert([
-          { 
+          {
             name: form.name,
             email: form.email,
             message: form.message,
             created_at: new Date()
           }
         ]);
-        
+
       if (error) throw error;
-      
+
       setSubmitSuccess(true);
       setForm({ name: '', email: '', message: '' });
-      
+
       // Reset success message after 5 seconds
       setTimeout(() => {
         setSubmitSuccess(false);
       }, 5000);
-      
+
     } catch (error) {
       console.error('Error submitting form:', error);
       setErrorMessage('There was a problem submitting your message. Please try again.');
@@ -109,7 +158,7 @@ const Contact = () => {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               Contact Information
             </h3>
-            
+
             {contactInfo.map((info, index) => (
               <motion.div
                 key={info.label}
@@ -159,9 +208,9 @@ const Contact = () => {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               Send a Message
             </h3>
-            
+
             {submitSuccess ? (
-              <motion.div 
+              <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="bg-green-100 p-4 rounded-lg flex items-center gap-3 mb-6"
@@ -170,13 +219,13 @@ const Contact = () => {
                 <p className="text-green-800">Thank you! Your message has been sent successfully.</p>
               </motion.div>
             ) : null}
-            
+
             {errorMessage ? (
               <div className="bg-red-100 p-4 rounded-lg text-red-800 mb-6">
                 {errorMessage}
               </div>
             ) : null}
-            
+
             <form className="space-y-6" onSubmit={handleSubmit}>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -188,11 +237,12 @@ const Contact = () => {
                   value={form.name}
                   onChange={handleChange}
                   required
+                  autoComplete="name"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="Your name"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Email
@@ -203,11 +253,12 @@ const Contact = () => {
                   value={form.email}
                   onChange={handleChange}
                   required
+                  autoComplete="email"
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                   placeholder="Your email"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Message
@@ -222,11 +273,15 @@ const Contact = () => {
                   placeholder="Your message"
                 ></textarea>
               </div>
-              
+
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className={`w-full ${isSubmitting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white py-3 rounded-lg font-medium transition-colors relative`}
+                className={`w-full ${
+                  isSubmitting 
+                    ? 'bg-gray-400' 
+                    : 'bg-green-600 hover:bg-green-700'
+                } text-white py-3 rounded-lg font-medium transition-colors relative`}
               >
                 {isSubmitting ? 'Sending...' : 'Send Message'}
               </button>

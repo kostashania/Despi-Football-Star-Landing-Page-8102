@@ -6,7 +6,7 @@ import supabase from '../lib/supabase';
 import AdminLogin from '../components/AdminLogin';
 import { isAuthenticated, logout } from '../utils/auth';
 
-const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut } = FiIcons;
+const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, FiSettings } = FiIcons;
 
 const AdminPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -20,6 +20,11 @@ const AdminPage = () => {
   
   const [videos, setVideos] = useState([]);
   const [messages, setMessages] = useState([]);
+  const [settings, setSettings] = useState({
+    recaptcha_enabled: false,
+    recaptcha_site_key: '',
+    recaptcha_secret_key: ''
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
   const [currentVideo, setCurrentVideo] = useState({
@@ -32,7 +37,8 @@ const AdminPage = () => {
   const tabs = [
     { id: 'hero', label: 'Hero Section', icon: FiEdit },
     { id: 'videos', label: 'Videos', icon: FiYoutube },
-    { id: 'messages', label: 'Messages', icon: FiMessageSquare }
+    { id: 'messages', label: 'Messages', icon: FiMessageSquare },
+    { id: 'settings', label: 'Settings', icon: FiSettings }
   ];
 
   useEffect(() => {
@@ -75,7 +81,13 @@ const AdminPage = () => {
           .order('created_at', { ascending: false });
           
         if (error) throw error;
-        setVideos(data || []);
+        // Filter out any unwanted videos
+        const filteredVideos = (data || []).filter(video => 
+          !video.title.toLowerCase().includes('music') &&
+          !video.description.toLowerCase().includes('music') &&
+          video.youtube_id !== 'dQw4w9WgXcQ'
+        );
+        setVideos(filteredVideos);
       }
       else if (activeTab === 'messages') {
         const { data, error } = await supabase
@@ -86,6 +98,24 @@ const AdminPage = () => {
         if (error) throw error;
         setMessages(data || []);
       }
+      else if (activeTab === 'settings') {
+        const { data, error } = await supabase
+          .from('admin_settings_despi_9a7b3c4d2e')
+          .select('*');
+          
+        if (error) throw error;
+        
+        const settingsObj = {};
+        (data || []).forEach(setting => {
+          settingsObj[setting.setting_key] = setting.setting_value;
+        });
+        
+        setSettings({
+          recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
+          recaptcha_site_key: settingsObj.recaptcha_site_key || '',
+          recaptcha_secret_key: settingsObj.recaptcha_secret_key || ''
+        });
+      }
     } catch (error) {
       console.error(`Error fetching ${activeTab} data:`, error);
     } finally {
@@ -95,7 +125,6 @@ const AdminPage = () => {
 
   const saveHeroContent = async () => {
     try {
-      // Check if hero content exists
       const { data: existingData, error: checkError } = await supabase
         .from('hero_content_despi_9a7b3c4d2e')
         .select('id')
@@ -106,13 +135,11 @@ const AdminPage = () => {
       let result;
       
       if (existingData && existingData.length > 0) {
-        // Update existing record
         result = await supabase
           .from('hero_content_despi_9a7b3c4d2e')
           .update(heroContent)
           .eq('id', existingData[0].id);
       } else {
-        // Insert new record
         result = await supabase
           .from('hero_content_despi_9a7b3c4d2e')
           .insert([heroContent]);
@@ -124,6 +151,29 @@ const AdminPage = () => {
     } catch (error) {
       console.error('Error saving hero content:', error);
       alert('Error saving hero content. Please try again.');
+    }
+  };
+
+  const saveSettings = async () => {
+    try {
+      const settingsToSave = [
+        { setting_key: 'recaptcha_enabled', setting_value: settings.recaptcha_enabled.toString() },
+        { setting_key: 'recaptcha_site_key', setting_value: settings.recaptcha_site_key },
+        { setting_key: 'recaptcha_secret_key', setting_value: settings.recaptcha_secret_key }
+      ];
+
+      for (const setting of settingsToSave) {
+        const { error } = await supabase
+          .from('admin_settings_despi_9a7b3c4d2e')
+          .upsert(setting, { onConflict: 'setting_key' });
+          
+        if (error) throw error;
+      }
+      
+      alert('Settings saved successfully!');
+    } catch (error) {
+      console.error('Error saving settings:', error);
+      alert('Error saving settings. Please try again.');
     }
   };
 
@@ -139,7 +189,6 @@ const AdminPage = () => {
     e.preventDefault();
     
     try {
-      // Extract YouTube ID if full URL is provided
       let youtubeId = null;
       if (currentVideo.url && currentVideo.url.includes('youtube.com')) {
         const urlParams = new URL(currentVideo.url).searchParams;
@@ -148,10 +197,17 @@ const AdminPage = () => {
         youtubeId = currentVideo.url.split('/').pop();
       }
       
+      // Prevent adding music videos or unwanted content
+      if (currentVideo.title.toLowerCase().includes('music') || 
+          currentVideo.description.toLowerCase().includes('music') ||
+          youtubeId === 'dQw4w9WgXcQ') {
+        alert('This video cannot be added. Please select a football-related video.');
+        return;
+      }
+      
       const videoData = {
         ...currentVideo,
         youtube_id: youtubeId,
-        // Set thumbnail if not provided
         thumbnail_url: currentVideo.thumbnail_url || (youtubeId ? `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg` : null),
         created_at: new Date()
       };
@@ -159,13 +215,11 @@ const AdminPage = () => {
       let result;
       
       if (currentVideo.id) {
-        // Update existing video
         result = await supabase
           .from('videos_despi_9a7b3c4d2e')
           .update(videoData)
           .eq('id', currentVideo.id);
       } else {
-        // Add new video
         result = await supabase
           .from('videos_despi_9a7b3c4d2e')
           .insert([videoData]);
@@ -173,7 +227,6 @@ const AdminPage = () => {
       
       if (result.error) throw result.error;
       
-      // Reset form and refresh data
       setCurrentVideo({
         title: '',
         description: '',
@@ -230,7 +283,6 @@ const AdminPage = () => {
     }
   };
 
-  // Show login form if not authenticated
   if (!isLoggedIn) {
     return <AdminLogin onLogin={handleLogin} />;
   }
@@ -365,7 +417,7 @@ const AdminPage = () => {
                 required
                 placeholder="https://www.youtube.com/watch?v=VIDEO_ID"
               />
-              <p className="text-xs text-gray-500 mt-1">Enter full YouTube URL</p>
+              <p className="text-xs text-gray-500 mt-1">Enter full YouTube URL (football-related videos only)</p>
             </div>
             
             <div>
@@ -476,12 +528,71 @@ const AdminPage = () => {
     </div>
   );
 
+  const renderSettingsTab = () => (
+    <div className="space-y-6">
+      <h3 className="text-xl font-semibold">Website Settings</h3>
+      
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h4 className="text-lg font-medium mb-4">reCAPTCHA Settings</h4>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="recaptcha_enabled"
+              checked={settings.recaptcha_enabled}
+              onChange={(e) => setSettings({...settings, recaptcha_enabled: e.target.checked})}
+              className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+            />
+            <label htmlFor="recaptcha_enabled" className="text-sm font-medium text-gray-700">
+              Enable reCAPTCHA for contact form
+            </label>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              reCAPTCHA Site Key
+            </label>
+            <input
+              type="text"
+              value={settings.recaptcha_site_key}
+              onChange={(e) => setSettings({...settings, recaptcha_site_key: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="Enter your reCAPTCHA site key"
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              reCAPTCHA Secret Key
+            </label>
+            <input
+              type="password"
+              value={settings.recaptcha_secret_key}
+              onChange={(e) => setSettings({...settings, recaptcha_secret_key: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="Enter your reCAPTCHA secret key"
+            />
+          </div>
+        </div>
+        
+        <div className="pt-4">
+          <button 
+            onClick={saveSettings}
+            className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+          >
+            <SafeIcon icon={FiSave} />
+            Save Settings
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-gray-100 pt-16 pb-12">
       <div className="container mx-auto px-4">
         <div className="bg-white rounded-xl shadow-lg overflow-hidden">
           <div className="md:flex">
-            {/* Sidebar */}
             <div className="md:w-64 bg-gray-800 text-white p-6">
               <h2 className="text-2xl font-bold mb-6">Admin Dashboard</h2>
               <nav className="space-y-2">
@@ -517,11 +628,11 @@ const AdminPage = () => {
               </div>
             </div>
             
-            {/* Main content */}
             <div className="flex-1 p-6">
               {activeTab === 'hero' && renderHeroTab()}
               {activeTab === 'videos' && renderVideosTab()}
               {activeTab === 'messages' && renderMessagesTab()}
+              {activeTab === 'settings' && renderSettingsTab()}
             </div>
           </div>
         </div>

@@ -121,8 +121,9 @@ const AdminLogin = ({ onLogin }) => {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                autoComplete="email"
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                placeholder="admin@despi.com"
+                placeholder="Enter your email"
               />
             </div>
           </div>
@@ -139,6 +140,7 @@ const AdminLogin = ({ onLogin }) => {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                autoComplete="current-password"
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
                 placeholder="Enter your password"
               />
@@ -164,12 +166,6 @@ const AdminLogin = ({ onLogin }) => {
             {isLoading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
-
-        <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600 mb-2"><strong>Demo Credentials:</strong></p>
-          <p className="text-sm text-gray-600">Email: admin@despi.com</p>
-          <p className="text-sm text-gray-600">Password: admin123</p>
-        </div>
 
         <div className="mt-6 text-center">
           <a 
