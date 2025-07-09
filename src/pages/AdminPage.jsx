@@ -40,9 +40,27 @@ const AdminPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
   const [emailTestResult, setEmailTestResult] = useState('');
-  const [currentVideo, setCurrentVideo] = useState({ title: '', description: '', url: '', thumbnail_url: '' });
-  const [currentImage, setCurrentImage] = useState({ title: '', alt_text: '', image_url: '', is_featured: false });
-  const [currentBioItem, setCurrentBioItem] = useState({ year: new Date().getFullYear(), description: '', sort_order: 0 });
+  const [currentVideo, setCurrentVideo] = useState({
+    title: '',
+    description: '',
+    url: '',
+    thumbnail_url: ''
+  });
+  const [currentImage, setCurrentImage] = useState({
+    id: null,
+    title: '',
+    alt_text: '',
+    image_url: '',
+    is_featured: false,
+    sort_order: 0
+  });
+  const [currentBioItem, setCurrentBioItem] = useState({
+    year: new Date().getFullYear(),
+    description: '',
+    sort_order: 0
+  });
+  const [showImageUploader, setShowImageUploader] = useState(false);
+  const [editingImageId, setEditingImageId] = useState(null);
 
   const tabs = [
     { id: 'messages', label: 'Messages', icon: FiMessageSquare },
@@ -79,7 +97,6 @@ const AdminPage = () => {
       if (activeTab === 'messages') {
         try {
           setDebugInfo('Fetching messages...');
-          // Use a simpler query to check if table exists and get messages
           const { data, error } = await supabase
             .from('contact_messages_despi_9a7b3c4d2e')
             .select('*')
@@ -88,7 +105,6 @@ const AdminPage = () => {
           if (error) {
             if (error.code === 'PGRST116') {
               setDebugInfo('Messages table does not exist. Creating it...');
-              // Table doesn't exist, we'll show the empty state
               setMessages([]);
             } else {
               throw error;
@@ -164,9 +180,9 @@ const AdminPage = () => {
             .order('created_at', { ascending: false });
 
           if (error && error.code !== 'PGRST116') throw error;
-          const filteredVideos = (data || []).filter(video => 
-            !video.title.toLowerCase().includes('music') && 
-            !video.description.toLowerCase().includes('music') && 
+          const filteredVideos = (data || []).filter(video =>
+            !video.title.toLowerCase().includes('music') &&
+            !video.description.toLowerCase().includes('music') &&
             video.youtube_id !== 'dQw4w9WgXcQ'
           );
           setVideos(filteredVideos);
@@ -212,7 +228,6 @@ const AdminPage = () => {
   const testEmailFunction = async () => {
     setEmailTestResult('Testing email function...');
     try {
-      // First try the Supabase Edge Function with the updated name
       const { data, error } = await supabase.functions.invoke('resend-email', {
         body: {
           to: settings.notification_emails.split(',')[0].trim(),
@@ -237,19 +252,18 @@ const AdminPage = () => {
       if (error) {
         throw error;
       }
-      
+
       setEmailTestResult('✅ Test email sent successfully via Supabase Edge Function!');
     } catch (supabaseError) {
       console.error('Supabase Edge Function failed:', supabaseError);
-      setEmailTestResult('❌ Supabase Edge Function failed: ' + supabaseError.message + '\n\nPossible issues:\n' + 
-        '1. Edge Function not deployed: Run `supabase functions deploy resend-email`\n' + 
-        '2. RESEND_API_KEY not set in Supabase secrets\n' + 
-        '3. From email not verified in Resend account\n' + 
-        '4. CORS configuration error\n\n' + 
+      setEmailTestResult('❌ Supabase Edge Function failed: ' + supabaseError.message + '\n\nPossible issues:\n' +
+        '1. Edge Function not deployed: Run `supabase functions deploy resend-email`\n' +
+        '2. RESEND_API_KEY not set in Supabase secrets\n' +
+        '3. From email not verified in Resend account\n' +
+        '4. CORS configuration error\n\n' +
         'The contact form will still save messages to the database, but email notifications won\'t work until this is fixed.');
     }
-    
-    // Clear the result after 15 seconds
+
     setTimeout(() => {
       setEmailTestResult('');
     }, 15000);
@@ -259,7 +273,11 @@ const AdminPage = () => {
     try {
       const { error } = await supabase
         .from('gallery_images_despi_9a7b3c4d2e')
-        .update({ is_approved: true, upload_status: 'approved', updated_at: new Date() })
+        .update({
+          is_approved: true,
+          upload_status: 'approved',
+          updated_at: new Date()
+        })
         .eq('id', imageId);
 
       if (error) throw error;
@@ -273,6 +291,7 @@ const AdminPage = () => {
 
   const rejectImage = async (imageId) => {
     if (!confirm('Are you sure you want to reject this image? This will permanently delete it.')) return;
+
     try {
       const { error } = await supabase
         .from('gallery_images_despi_9a7b3c4d2e')
@@ -320,10 +339,10 @@ const AdminPage = () => {
             .from('admin_settings_despi_9a7b3c4d2e')
             .insert([setting]);
         }
-        
+
         if (result.error) throw result.error;
       }
-      
+
       alert('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -333,6 +352,7 @@ const AdminPage = () => {
 
   const deleteGalleryImage = async (imageId) => {
     if (!confirm('Are you sure you want to delete this image?')) return;
+
     try {
       const { error } = await supabase
         .from('gallery_images_despi_9a7b3c4d2e')
@@ -363,28 +383,224 @@ const AdminPage = () => {
     }
   };
 
+  const moveImageUp = async (imageId, currentOrder) => {
+    try {
+      // Find the image with the previous sort order
+      const { data: prevImage } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .select('id, sort_order')
+        .eq('is_approved', true)
+        .lt('sort_order', currentOrder)
+        .order('sort_order', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (prevImage) {
+        // Swap sort orders
+        await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .update({ sort_order: prevImage.sort_order })
+          .eq('id', imageId);
+
+        await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .update({ sort_order: currentOrder })
+          .eq('id', prevImage.id);
+
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Error moving image up:', error);
+      alert('Error moving image. Please try again.');
+    }
+  };
+
+  const moveImageDown = async (imageId, currentOrder) => {
+    try {
+      // Find the image with the next sort order
+      const { data: nextImage } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .select('id, sort_order')
+        .eq('is_approved', true)
+        .gt('sort_order', currentOrder)
+        .order('sort_order', { ascending: true })
+        .limit(1)
+        .single();
+
+      if (nextImage) {
+        // Swap sort orders
+        await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .update({ sort_order: nextImage.sort_order })
+          .eq('id', imageId);
+
+        await supabase
+          .from('gallery_images_despi_9a7b3c4d2e')
+          .update({ sort_order: currentOrder })
+          .eq('id', nextImage.id);
+
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Error moving image down:', error);
+      alert('Error moving image. Please try again.');
+    }
+  };
+
+  const startEditImage = (image) => {
+    setCurrentImage({
+      id: image.id,
+      title: image.title,
+      alt_text: image.alt_text,
+      image_url: image.image_url,
+      is_featured: image.is_featured,
+      sort_order: image.sort_order
+    });
+    setEditingImageId(image.id);
+  };
+
+  const cancelEditImage = () => {
+    setCurrentImage({
+      id: null,
+      title: '',
+      alt_text: '',
+      image_url: '',
+      is_featured: false,
+      sort_order: 0
+    });
+    setEditingImageId(null);
+  };
+
+  const saveImageEdit = async () => {
+    if (!currentImage.title || !currentImage.alt_text || !currentImage.image_url) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .update({
+          title: currentImage.title,
+          alt_text: currentImage.alt_text,
+          image_url: currentImage.image_url,
+          is_featured: currentImage.is_featured,
+          sort_order: currentImage.sort_order,
+          updated_at: new Date()
+        })
+        .eq('id', currentImage.id);
+
+      if (error) throw error;
+
+      cancelEditImage();
+      fetchData();
+      alert('Image updated successfully!');
+    } catch (error) {
+      console.error('Error updating image:', error);
+      alert('Error updating image. Please try again.');
+    }
+  };
+
+  const addNewImage = async () => {
+    if (!currentImage.title || !currentImage.alt_text || !currentImage.image_url) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      // Get the next sort order
+      const { data: existingImages } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .select('sort_order')
+        .eq('is_approved', true)
+        .order('sort_order', { ascending: false })
+        .limit(1);
+
+      const nextSortOrder = existingImages && existingImages.length > 0 
+        ? existingImages[0].sort_order + 1 
+        : 0;
+
+      const { error } = await supabase
+        .from('gallery_images_despi_9a7b3c4d2e')
+        .insert([{
+          title: currentImage.title,
+          alt_text: currentImage.alt_text,
+          image_url: currentImage.image_url,
+          is_featured: currentImage.is_featured,
+          is_approved: true,
+          sort_order: nextSortOrder,
+          uploaded_by: 'admin',
+          upload_status: 'approved',
+          created_at: new Date(),
+          updated_at: new Date()
+        }]);
+
+      if (error) throw error;
+
+      setCurrentImage({
+        id: null,
+        title: '',
+        alt_text: '',
+        image_url: '',
+        is_featured: false,
+        sort_order: 0
+      });
+      setIsEditing(false);
+      fetchData();
+      alert('Image added successfully!');
+    } catch (error) {
+      console.error('Error adding image:', error);
+      alert('Error adding image. Please try again.');
+    }
+  };
+
+  const handleImageUploadSuccess = async (imageUrl) => {
+    try {
+      setCurrentImage({
+        ...currentImage,
+        image_url: imageUrl
+      });
+      setShowImageUploader(false);
+      alert('Image uploaded successfully! Please add title and description.');
+    } catch (error) {
+      console.error('Error handling image upload:', error);
+      alert('Error handling image upload. Please try again.');
+    }
+  };
+
   const addVideo = async () => {
     if (!currentVideo.title || !currentVideo.url) {
       alert('Please fill in title and URL');
       return;
     }
-    
+
     try {
       const extractYoutubeId = (url) => {
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
         const match = url.match(regExp);
         return (match && match[2].length === 11) ? match[2] : null;
       };
-      
+
       const youtubeId = extractYoutubeId(currentVideo.url);
       const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : '';
-      
+
       const { error } = await supabase
         .from('videos_despi_9a7b3c4d2e')
-        .insert([{...currentVideo, youtube_id: youtubeId, thumbnail_url: thumbnailUrl, created_at: new Date()}]);
-        
+        .insert([{
+          ...currentVideo,
+          youtube_id: youtubeId,
+          thumbnail_url: thumbnailUrl,
+          created_at: new Date()
+        }]);
+
       if (error) throw error;
-      setCurrentVideo({ title: '', description: '', url: '', thumbnail_url: '' });
+
+      setCurrentVideo({
+        title: '',
+        description: '',
+        url: '',
+        thumbnail_url: ''
+      });
       fetchData();
       alert('Video added successfully!');
     } catch (error) {
@@ -395,6 +611,7 @@ const AdminPage = () => {
 
   const deleteVideo = async (videoId) => {
     if (!confirm('Are you sure you want to delete this video?')) return;
+
     try {
       const { error } = await supabase
         .from('videos_despi_9a7b3c4d2e')
@@ -426,6 +643,7 @@ const AdminPage = () => {
 
   const deleteMessage = async (messageId) => {
     if (!confirm('Are you sure you want to delete this message?')) return;
+
     try {
       const { error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
@@ -446,14 +664,24 @@ const AdminPage = () => {
       alert('Please fill in year and description');
       return;
     }
-    
+
     try {
       const { error } = await supabase
         .from('bio_timeline_despi_9a7b3c4d2e')
-        .insert([{...currentBioItem, is_active: true, created_at: new Date(), updated_at: new Date()}]);
-        
+        .insert([{
+          ...currentBioItem,
+          is_active: true,
+          created_at: new Date(),
+          updated_at: new Date()
+        }]);
+
       if (error) throw error;
-      setCurrentBioItem({ year: new Date().getFullYear(), description: '', sort_order: 0 });
+
+      setCurrentBioItem({
+        year: new Date().getFullYear(),
+        description: '',
+        sort_order: 0
+      });
       fetchData();
       alert('Bio item added successfully!');
     } catch (error) {
@@ -464,6 +692,7 @@ const AdminPage = () => {
 
   const deleteBioItem = async (itemId) => {
     if (!confirm('Are you sure you want to delete this bio item?')) return;
+
     try {
       const { error } = await supabase
         .from('bio_timeline_despi_9a7b3c4d2e')
@@ -497,7 +726,6 @@ const AdminPage = () => {
   const createSampleMessage = async () => {
     try {
       setDebugInfo('Creating sample message...');
-      // Add a sample message
       const sampleMessage = {
         name: 'Test User',
         email: 'test@example.com',
@@ -505,14 +733,14 @@ const AdminPage = () => {
         is_read: false,
         created_at: new Date()
       };
-      
+
       const { data, error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
         .insert([sampleMessage])
         .select();
-        
+
       if (error) throw error;
-      
+
       setDebugInfo('Sample message created successfully: ' + JSON.stringify(data));
       fetchData();
       alert('Sample message added!');
@@ -528,14 +756,14 @@ const AdminPage = () => {
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Contact Messages</h3>
         <div className="flex gap-2">
-          <button 
+          <button
             onClick={() => fetchData()}
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
           >
             <SafeIcon icon={FiRefreshCw} className="w-4 h-4" />
             Refresh
           </button>
-          <button 
+          <button
             onClick={createSampleMessage}
             className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
           >
@@ -549,7 +777,10 @@ const AdminPage = () => {
         <div className="bg-gray-100 p-4 rounded-lg text-xs font-mono whitespace-pre-wrap overflow-auto max-h-40 mb-4">
           <div className="flex justify-between">
             <h4 className="font-bold mb-2">Debug Information</h4>
-            <button onClick={() => setDebugInfo('')} className="text-gray-500 hover:text-gray-700">
+            <button
+              onClick={() => setDebugInfo('')}
+              className="text-gray-500 hover:text-gray-700"
+            >
               <SafeIcon icon={FiX} className="w-4 h-4" />
             </button>
           </div>
@@ -584,7 +815,7 @@ const AdminPage = () => {
                       <li>Ensure the form is properly connected to the database</li>
                     </ul>
                   </div>
-                  <button 
+                  <button
                     onClick={createSampleMessage}
                     className="bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-md text-blue-800 transition-colors flex items-center gap-2"
                   >
@@ -596,8 +827,8 @@ const AdminPage = () => {
             </div>
           ) : (
             messages.map((message) => (
-              <div 
-                key={message.id} 
+              <div
+                key={message.id}
                 className={`bg-white p-4 rounded-lg shadow ${!message.is_read ? 'border-l-4 border-blue-400' : ''}`}
               >
                 <div className="flex justify-between items-start mb-3">
@@ -618,7 +849,7 @@ const AdminPage = () => {
                 </div>
                 <p className="text-gray-700 mb-3">{message.message}</p>
                 <div className="flex gap-2">
-                  <a 
+                  <a
                     href={`mailto:${message.email}`}
                     className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1"
                   >
@@ -626,14 +857,14 @@ const AdminPage = () => {
                     Reply
                   </a>
                   {!message.is_read && (
-                    <button 
+                    <button
                       onClick={() => markMessageAsRead(message.id)}
                       className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                     >
                       Mark as Read
                     </button>
                   )}
-                  <button 
+                  <button
                     onClick={() => deleteMessage(message.id)}
                     className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
                   >
@@ -666,7 +897,9 @@ const AdminPage = () => {
                       src={image.image_url}
                       alt={image.alt_text}
                       className="w-full h-24 object-cover rounded"
-                      onError={(e) => {e.target.src='https://via.placeholder.com/160x96?text=Image';}}
+                      onError={(e) => {
+                        e.target.src = 'https://via.placeholder.com/160x96?text=Image';
+                      }}
                     />
                   </div>
                   <div className="flex-grow">
@@ -685,21 +918,21 @@ const AdminPage = () => {
                     </div>
                   </div>
                   <div className="flex-shrink-0 flex flex-col gap-2">
-                    <button 
+                    <button
                       onClick={() => approveImage(image.id)}
                       className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
                     >
                       <SafeIcon icon={FiCheck} className="w-4 h-4" />
                       Approve
                     </button>
-                    <button 
+                    <button
                       onClick={() => rejectImage(image.id)}
                       className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-1"
                     >
                       <SafeIcon icon={FiX} className="w-4 h-4" />
                       Reject
                     </button>
-                    <a 
+                    <a
                       href={image.image_url}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -722,7 +955,7 @@ const AdminPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Bio Timeline Management</h3>
-        <button 
+        <button
           onClick={() => setIsEditing(!isEditing)}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
         >
@@ -739,7 +972,7 @@ const AdminPage = () => {
               <input
                 type="number"
                 value={currentBioItem.year}
-                onChange={(e) => setCurrentBioItem({...currentBioItem, year: parseInt(e.target.value)})}
+                onChange={(e) => setCurrentBioItem({ ...currentBioItem, year: parseInt(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="2024"
                 min="1900"
@@ -750,7 +983,7 @@ const AdminPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={currentBioItem.description}
-                onChange={(e) => setCurrentBioItem({...currentBioItem, description: e.target.value})}
+                onChange={(e) => setCurrentBioItem({ ...currentBioItem, description: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 rows="3"
                 placeholder="Despi joins K10 of Finikas Italian Academy"
@@ -761,20 +994,20 @@ const AdminPage = () => {
               <input
                 type="number"
                 value={currentBioItem.sort_order}
-                onChange={(e) => setCurrentBioItem({...currentBioItem, sort_order: parseInt(e.target.value)})}
+                onChange={(e) => setCurrentBioItem({ ...currentBioItem, sort_order: parseInt(e.target.value) })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="0"
                 min="0"
               />
             </div>
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={addBioItem}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
                 Add Bio Item
               </button>
-              <button 
+              <button
                 onClick={() => setIsEditing(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               >
@@ -817,13 +1050,13 @@ const AdminPage = () => {
                     </div>
                   </div>
                   <div className="flex-shrink-0 flex gap-2">
-                    <button 
+                    <button
                       onClick={() => toggleBioItemActive(item.id, item.is_active)}
                       className={`px-3 py-1 text-xs rounded ${item.is_active ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}
                     >
                       {item.is_active ? 'Hide' : 'Show'}
                     </button>
-                    <button 
+                    <button
                       onClick={() => deleteBioItem(item.id)}
                       className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
                     >
@@ -841,48 +1074,282 @@ const AdminPage = () => {
 
   const renderGalleryTab = () => (
     <div className="space-y-6">
-      <h3 className="text-xl font-semibold">Gallery Management</h3>
+      <div className="flex justify-between items-center">
+        <h3 className="text-xl font-semibold">Gallery Management</h3>
+        <button
+          onClick={() => setIsEditing(!isEditing)}
+          className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
+        >
+          <SafeIcon icon={FiPlus} className="w-4 h-4" />
+          {isEditing ? 'Cancel' : 'Add Image'}
+        </button>
+      </div>
+
+      {isEditing && (
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h4 className="text-lg font-medium mb-4">Add New Image</h4>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+              <input
+                type="text"
+                value={currentImage.title}
+                onChange={(e) => setCurrentImage({ ...currentImage, title: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Enter image title"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Alt Text *</label>
+              <input
+                type="text"
+                value={currentImage.alt_text}
+                onChange={(e) => setCurrentImage({ ...currentImage, alt_text: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="Describe the image for accessibility"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Image URL *</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={currentImage.image_url}
+                  onChange={(e) => setCurrentImage({ ...currentImage, image_url: e.target.value })}
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                  placeholder="https://example.com/image.jpg or upload a file"
+                />
+                <button
+                  onClick={() => setShowImageUploader(true)}
+                  className="px-3 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-1"
+                >
+                  <SafeIcon icon={FiUpload} className="w-4 h-4" />
+                  Upload
+                </button>
+              </div>
+            </div>
+            {currentImage.image_url && (
+              <div className="mt-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Preview</label>
+                <img
+                  src={currentImage.image_url}
+                  alt="Preview"
+                  className="w-full max-w-md h-48 object-cover rounded-md border"
+                  onError={(e) => {
+                    e.target.src = 'https://via.placeholder.com/300x200?text=Invalid+Image+URL';
+                  }}
+                />
+              </div>
+            )}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Sort Order</label>
+              <input
+                type="number"
+                value={currentImage.sort_order}
+                onChange={(e) => setCurrentImage({ ...currentImage, sort_order: parseInt(e.target.value) })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                placeholder="0"
+                min="0"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="is_featured"
+                checked={currentImage.is_featured}
+                onChange={(e) => setCurrentImage({ ...currentImage, is_featured: e.target.checked })}
+                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+              />
+              <label htmlFor="is_featured" className="text-sm font-medium text-gray-700">
+                Featured Image
+              </label>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={addNewImage}
+                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
+              >
+                Add Image
+              </button>
+              <button
+                onClick={() => setIsEditing(false)}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Upload Modal */}
+      {showImageUploader && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowImageUploader(false)}
+        >
+          <motion.div
+            initial={{ scale: 0.8 }}
+            animate={{ scale: 1 }}
+            exit={{ scale: 0.8 }}
+            className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-bold text-gray-900">Upload Image</h3>
+              <button
+                onClick={() => setShowImageUploader(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <SafeIcon icon={FiX} className="w-6 h-6" />
+              </button>
+            </div>
+            <ImageUploader
+              onUploadSuccess={handleImageUploadSuccess}
+              onCancel={() => setShowImageUploader(false)}
+            />
+          </motion.div>
+        </motion.div>
+      )}
+
       {isLoading ? (
         <p>Loading gallery images...</p>
       ) : (
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
           {galleryImages.length === 0 ? (
             <div className="col-span-full bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
-              <p>No gallery images yet. Approve user-uploaded images or add your own.</p>
+              <p>No gallery images yet. Add your first image using the "Add Image" button above.</p>
             </div>
           ) : (
             galleryImages.map((image) => (
               <div key={image.id} className="bg-white p-4 rounded-lg shadow">
-                <div className="relative mb-3">
-                  <img
-                    src={image.image_url}
-                    alt={image.alt_text}
-                    className="w-full h-32 object-cover rounded"
-                    onError={(e) => {e.target.src='https://via.placeholder.com/200x128?text=Image';}}
-                  />
-                  {image.is_featured && (
-                    <span className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
-                      <SafeIcon icon={FiStar} className="w-3 h-3 inline mr-1" />
-                      Featured
-                    </span>
-                  )}
-                </div>
-                <h4 className="font-medium mb-2">{image.title}</h4>
-                <p className="text-sm text-gray-600 mb-3">{image.alt_text}</p>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => toggleImageFeatured(image.id, image.is_featured)}
-                    className={`px-3 py-1 text-xs rounded ${image.is_featured ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'}`}
-                  >
-                    {image.is_featured ? 'Unfeature' : 'Feature'}
-                  </button>
-                  <button 
-                    onClick={() => deleteGalleryImage(image.id)}
-                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
+                {editingImageId === image.id ? (
+                  <div className="space-y-3">
+                    <div className="relative mb-3">
+                      <img
+                        src={image.image_url}
+                        alt={image.alt_text}
+                        className="w-full h-32 object-cover rounded"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/200x128?text=Image';
+                        }}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                      <input
+                        type="text"
+                        value={currentImage.title}
+                        onChange={(e) => setCurrentImage({ ...currentImage, title: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Alt Text</label>
+                      <input
+                        type="text"
+                        value={currentImage.alt_text}
+                        onChange={(e) => setCurrentImage({ ...currentImage, alt_text: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Image URL</label>
+                      <input
+                        type="url"
+                        value={currentImage.image_url}
+                        onChange={(e) => setCurrentImage({ ...currentImage, image_url: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`featured-${image.id}`}
+                        checked={currentImage.is_featured}
+                        onChange={(e) => setCurrentImage({ ...currentImage, is_featured: e.target.checked })}
+                        className="w-3 h-3 text-green-600 rounded focus:ring-green-500"
+                      />
+                      <label htmlFor={`featured-${image.id}`} className="text-xs text-gray-700">
+                        Featured
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={saveImageEdit}
+                        className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={cancelEditImage}
+                        className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="relative mb-3">
+                      <img
+                        src={image.image_url}
+                        alt={image.alt_text}
+                        className="w-full h-32 object-cover rounded"
+                        onError={(e) => {
+                          e.target.src = 'https://via.placeholder.com/200x128?text=Image';
+                        }}
+                      />
+                      {image.is_featured && (
+                        <span className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
+                          <SafeIcon icon={FiStar} className="w-3 h-3 inline mr-1" />
+                          Featured
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-medium mb-2">{image.title}</h4>
+                    <p className="text-sm text-gray-600 mb-3">{image.alt_text}</p>
+                    <div className="text-xs text-gray-500 mb-3">
+                      Sort Order: {image.sort_order}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={() => startEditImage(image)}
+                        className="px-2 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        <SafeIcon icon={FiEdit} className="w-3 h-3" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => toggleImageFeatured(image.id, image.is_featured)}
+                        className={`px-2 py-1 text-xs rounded ${image.is_featured ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {image.is_featured ? 'Unfeature' : 'Feature'}
+                      </button>
+                      <button
+                        onClick={() => moveImageUp(image.id, image.sort_order)}
+                        className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                      >
+                        <SafeIcon icon={FiArrowUp} className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => moveImageDown(image.id, image.sort_order)}
+                        className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                      >
+                        <SafeIcon icon={FiArrowDown} className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => deleteGalleryImage(image.id)}
+                        className="px-2 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))
           )}
@@ -895,7 +1362,7 @@ const AdminPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Video Management</h3>
-        <button 
+        <button
           onClick={() => setIsEditing(!isEditing)}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
         >
@@ -912,7 +1379,7 @@ const AdminPage = () => {
               <input
                 type="text"
                 value={currentVideo.title}
-                onChange={(e) => setCurrentVideo({...currentVideo, title: e.target.value})}
+                onChange={(e) => setCurrentVideo({ ...currentVideo, title: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="Enter video title"
               />
@@ -921,7 +1388,7 @@ const AdminPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={currentVideo.description}
-                onChange={(e) => setCurrentVideo({...currentVideo, description: e.target.value})}
+                onChange={(e) => setCurrentVideo({ ...currentVideo, description: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 rows="3"
                 placeholder="Enter video description"
@@ -932,19 +1399,19 @@ const AdminPage = () => {
               <input
                 type="url"
                 value={currentVideo.url}
-                onChange={(e) => setCurrentVideo({...currentVideo, url: e.target.value})}
+                onChange={(e) => setCurrentVideo({ ...currentVideo, url: e.target.value })}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="https://www.youtube.com/watch?v=..."
               />
             </div>
             <div className="flex gap-3">
-              <button 
+              <button
                 onClick={addVideo}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
                 Add Video
               </button>
-              <button 
+              <button
                 onClick={() => setIsEditing(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               >
@@ -979,7 +1446,7 @@ const AdminPage = () => {
                 <h4 className="font-medium mb-2">{video.title}</h4>
                 <p className="text-sm text-gray-600 mb-3">{video.description}</p>
                 <div className="flex gap-2">
-                  <a 
+                  <a
                     href={video.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -988,7 +1455,7 @@ const AdminPage = () => {
                     <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
                     View
                   </a>
-                  <button 
+                  <button
                     onClick={() => deleteVideo(video.id)}
                     className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
                   >
@@ -1015,14 +1482,13 @@ const AdminPage = () => {
               type="checkbox"
               id="email_notifications_enabled"
               checked={settings.email_notifications_enabled}
-              onChange={(e) => setSettings({...settings, email_notifications_enabled: e.target.checked})}
+              onChange={(e) => setSettings({ ...settings, email_notifications_enabled: e.target.checked })}
               className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
             />
             <label htmlFor="email_notifications_enabled" className="text-sm font-medium text-gray-700">
               Enable email notifications for new contact messages
             </label>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Notification Email Addresses
@@ -1030,7 +1496,7 @@ const AdminPage = () => {
             <input
               type="text"
               value={settings.notification_emails}
-              onChange={(e) => setSettings({...settings, notification_emails: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, notification_emails: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="email1@example.com, email2@example.com"
             />
@@ -1038,7 +1504,6 @@ const AdminPage = () => {
               Separate multiple email addresses with commas. These emails will receive notifications for new messages.
             </p>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               From Email Address
@@ -1046,7 +1511,7 @@ const AdminPage = () => {
             <input
               type="email"
               value={settings.email_from_address}
-              onChange={(e) => setSettings({...settings, email_from_address: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, email_from_address: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="noreply@asvesta.eu"
             />
@@ -1054,9 +1519,8 @@ const AdminPage = () => {
               This email address must be verified in your Resend account
             </p>
           </div>
-
           <div className="pt-4 border-t">
-            <button 
+            <button
               onClick={testEmailFunction}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
             >
@@ -1086,7 +1550,7 @@ const AdminPage = () => {
             <input
               type="url"
               value={settings.social_youtube_url}
-              onChange={(e) => setSettings({...settings, social_youtube_url: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, social_youtube_url: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://www.youtube.com/@despi5740"
             />
@@ -1098,7 +1562,7 @@ const AdminPage = () => {
             <input
               type="url"
               value={settings.social_instagram_url}
-              onChange={(e) => setSettings({...settings, social_instagram_url: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, social_instagram_url: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://instagram.com/despi_football"
             />
@@ -1110,7 +1574,7 @@ const AdminPage = () => {
             <input
               type="url"
               value={settings.social_facebook_url}
-              onChange={(e) => setSettings({...settings, social_facebook_url: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, social_facebook_url: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://facebook.com/despi.football"
             />
@@ -1126,14 +1590,13 @@ const AdminPage = () => {
               type="checkbox"
               id="recaptcha_enabled"
               checked={settings.recaptcha_enabled}
-              onChange={(e) => setSettings({...settings, recaptcha_enabled: e.target.checked})}
+              onChange={(e) => setSettings({ ...settings, recaptcha_enabled: e.target.checked })}
               className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
             />
             <label htmlFor="recaptcha_enabled" className="text-sm font-medium text-gray-700">
               Enable reCAPTCHA for contact form and image uploads
             </label>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               reCAPTCHA Site Key
@@ -1141,7 +1604,7 @@ const AdminPage = () => {
             <input
               type="text"
               value={settings.recaptcha_site_key}
-              onChange={(e) => setSettings({...settings, recaptcha_site_key: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, recaptcha_site_key: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="Enter your reCAPTCHA site key"
             />
@@ -1157,7 +1620,6 @@ const AdminPage = () => {
               </a>
             </p>
           </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               reCAPTCHA Secret Key
@@ -1165,7 +1627,7 @@ const AdminPage = () => {
             <input
               type="password"
               value={settings.recaptcha_secret_key}
-              onChange={(e) => setSettings({...settings, recaptcha_secret_key: e.target.value})}
+              onChange={(e) => setSettings({ ...settings, recaptcha_secret_key: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="Enter your reCAPTCHA secret key"
               autoComplete="new-password"
@@ -1178,7 +1640,7 @@ const AdminPage = () => {
       </div>
 
       <div className="pt-4">
-        <button 
+        <button
           onClick={saveSettings}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
         >
@@ -1199,7 +1661,7 @@ const AdminPage = () => {
             type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             value={heroContent.title}
-            onChange={(e) => setHeroContent({...heroContent, title: e.target.value})}
+            onChange={(e) => setHeroContent({ ...heroContent, title: e.target.value })}
           />
         </div>
         <div>
@@ -1208,7 +1670,7 @@ const AdminPage = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             rows="4"
             value={heroContent.subtitle}
-            onChange={(e) => setHeroContent({...heroContent, subtitle: e.target.value})}
+            onChange={(e) => setHeroContent({ ...heroContent, subtitle: e.target.value })}
           ></textarea>
         </div>
         <div>
@@ -1217,7 +1679,7 @@ const AdminPage = () => {
             type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             value={heroContent.buttonText}
-            onChange={(e) => setHeroContent({...heroContent, buttonText: e.target.value})}
+            onChange={(e) => setHeroContent({ ...heroContent, buttonText: e.target.value })}
           />
         </div>
         <div>
@@ -1226,33 +1688,33 @@ const AdminPage = () => {
             type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             value={heroContent.buttonLink}
-            onChange={(e) => setHeroContent({...heroContent, buttonLink: e.target.value})}
+            onChange={(e) => setHeroContent({ ...heroContent, buttonLink: e.target.value })}
           />
         </div>
       </div>
       <div className="pt-4">
-        <button 
+        <button
           onClick={async () => {
             try {
               const { data: existingData, error: checkError } = await supabase
                 .from('hero_content_despi_9a7b3c4d2e')
                 .select('id')
                 .limit(1);
-                
+
               if (checkError && checkError.code !== 'PGRST116') throw checkError;
-              
+
               let result;
               if (existingData && existingData.length > 0) {
                 result = await supabase
                   .from('hero_content_despi_9a7b3c4d2e')
-                  .update({...heroContent, updated_at: new Date()})
+                  .update({ ...heroContent, updated_at: new Date() })
                   .eq('id', existingData[0].id);
               } else {
                 result = await supabase
                   .from('hero_content_despi_9a7b3c4d2e')
-                  .insert([{...heroContent, created_at: new Date(), updated_at: new Date()}]);
+                  .insert([{ ...heroContent, created_at: new Date(), updated_at: new Date() }]);
               }
-              
+
               if (result.error) throw result.error;
               alert('Hero content saved successfully!');
             } catch (error) {
@@ -1286,7 +1748,9 @@ const AdminPage = () => {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      activeTab === tab.id ? 'bg-green-600 text-white' : 'text-gray-300 hover:bg-gray-700'
+                      activeTab === tab.id
+                        ? 'bg-green-600 text-white'
+                        : 'text-gray-300 hover:bg-gray-700'
                     }`}
                   >
                     <SafeIcon icon={tab.icon} />
