@@ -35,61 +35,7 @@ const Contact = () => {
 
   useEffect(() => {
     fetchSettings();
-    ensureContactTable();
   }, []);
-
-  const ensureContactTable = async () => {
-    try {
-      // Check if the table exists
-      const { data, error } = await supabase
-        .from('contact_messages_despi_9a7b3c4d2e')
-        .select('id')
-        .limit(1);
-      
-      if (error && error.code === 'PGRST116') {
-        console.log("Contact messages table doesn't exist. Creating it...");
-        
-        // Create table with proper RLS
-        const createTableQuery = `
-          CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            name TEXT NOT NULL,
-            email TEXT NOT NULL,
-            message TEXT NOT NULL,
-            is_read BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          
-          -- Enable Row Level Security
-          ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-          
-          -- Create policies for authenticated users (admins)
-          CREATE POLICY "Allow select for authenticated users" 
-            ON contact_messages_despi_9a7b3c4d2e FOR SELECT 
-            USING (auth.role() = 'authenticated');
-            
-          CREATE POLICY "Allow update for authenticated users" 
-            ON contact_messages_despi_9a7b3c4d2e FOR UPDATE 
-            USING (auth.role() = 'authenticated')
-            WITH CHECK (auth.role() = 'authenticated');
-            
-          CREATE POLICY "Allow delete for authenticated users" 
-            ON contact_messages_despi_9a7b3c4d2e FOR DELETE 
-            USING (auth.role() = 'authenticated');
-          
-          -- Create policy for anonymous users to insert messages
-          CREATE POLICY "Allow insert for anonymous users" 
-            ON contact_messages_despi_9a7b3c4d2e FOR INSERT 
-            WITH CHECK (true);
-        `;
-        
-        await supabase.rpc('execute_sql', { query: createTableQuery });
-        console.log("Contact messages table created successfully!");
-      }
-    } catch (error) {
-      console.error("Error ensuring contact table exists:", error);
-    }
-  };
 
   const fetchSettings = async () => {
     try {
@@ -97,17 +43,17 @@ const Contact = () => {
         .from('admin_settings_despi_9a7b3c4d2e')
         .select('*')
         .in('setting_key', [
-          'recaptcha_enabled', 
+          'recaptcha_enabled',
           'recaptcha_site_key',
           'social_youtube_url',
           'social_instagram_url',
           'social_facebook_url'
         ]);
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') throw error;
 
       const settings = {};
-      data.forEach(setting => {
+      (data || []).forEach(setting => {
         settings[setting.setting_key] = setting.setting_value;
       });
 
@@ -148,10 +94,10 @@ const Contact = () => {
         .select('*')
         .in('setting_key', ['notification_emails', 'email_notifications_enabled']);
 
-      if (settingsError) throw settingsError;
+      if (settingsError && settingsError.code !== 'PGRST116') throw settingsError;
 
       const settings = {};
-      settingsData.forEach(setting => {
+      (settingsData || []).forEach(setting => {
         settings[setting.setting_key] = setting.setting_value;
       });
 
@@ -176,18 +122,15 @@ const Contact = () => {
             <h1 style="margin: 0; font-size: 24px;">New Contact Message</h1>
             <p style="margin: 10px 0 0 0; opacity: 0.9;">Despi's Website</p>
           </div>
-          
           <div style="background: #f8f9fa; padding: 20px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
             <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
               <h2 style="color: #16a34a; margin-top: 0;">Message Details</h2>
-              
               <div style="margin-bottom: 15px;">
                 <strong style="color: #374151;">Name:</strong>
                 <div style="margin-top: 5px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
                   ${messageData.name}
                 </div>
               </div>
-              
               <div style="margin-bottom: 15px;">
                 <strong style="color: #374151;">Email:</strong>
                 <div style="margin-top: 5px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
@@ -196,14 +139,12 @@ const Contact = () => {
                   </a>
                 </div>
               </div>
-              
               <div style="margin-bottom: 15px;">
                 <strong style="color: #374151;">Message:</strong>
                 <div style="margin-top: 5px; padding: 15px; background: #f3f4f6; border-radius: 5px; line-height: 1.6;">
                   ${messageData.message.replace(/\n/g, '<br>')}
                 </div>
               </div>
-              
               <div style="margin-bottom: 15px;">
                 <strong style="color: #374151;">Received:</strong>
                 <div style="margin-top: 5px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
@@ -211,14 +152,11 @@ const Contact = () => {
                 </div>
               </div>
             </div>
-            
             <div style="text-align: center; margin-top: 20px;">
-              <a href="${window.location.origin}/#/admin" 
-                 style="background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              <a href="${window.location.origin}/#/admin" style="background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                 View in Admin Panel
               </a>
             </div>
-            
             <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center; color: #6b7280; font-size: 14px;">
               <p>This email was sent automatically from Despi's website contact form.</p>
             </div>
@@ -287,7 +225,7 @@ const Contact = () => {
 
       console.log("Message submitted successfully:", data);
 
-      // Send email notification
+      // Send email notification if message was saved
       if (data && data.length > 0) {
         await sendEmailNotification(data[0]);
       }
@@ -305,7 +243,7 @@ const Contact = () => {
       setTimeout(() => {
         setSubmitSuccess(false);
       }, 5000);
-      
+
     } catch (error) {
       console.error('Error submitting form:', error);
       setErrorMessage('There was a problem submitting your message. Please try again. Error: ' + (error.message || error));

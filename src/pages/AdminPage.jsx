@@ -91,273 +91,140 @@ const AdminPage = () => {
     setIsLoggedIn(false);
   };
 
-  // Create necessary tables if they don't exist
-  const ensureTablesExist = async () => {
-    try {
-      setDebugInfo('Checking tables existence...');
-      
-      // Check if contact_messages table exists
-      try {
-        const { data: messagesTableCheck, error: messagesTableError } = await supabase
-          .from('contact_messages_despi_9a7b3c4d2e')
-          .select('id')
-          .limit(1);
-        
-        if (messagesTableError && messagesTableError.code === 'PGRST116') {
-          setDebugInfo(prevInfo => prevInfo + '\nCreating contact_messages table...');
-          
-          // Create contact_messages table if it doesn't exist
-          const createMessagesTableQuery = `
-            CREATE TABLE IF NOT EXISTS contact_messages_despi_9a7b3c4d2e (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              name TEXT NOT NULL,
-              email TEXT NOT NULL,
-              message TEXT NOT NULL,
-              is_read BOOLEAN DEFAULT FALSE,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-            
-            -- Enable Row Level Security
-            ALTER TABLE contact_messages_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-            
-            -- Create policies for authenticated users (admins)
-            CREATE POLICY "Allow select for authenticated users" 
-              ON contact_messages_despi_9a7b3c4d2e FOR SELECT 
-              USING (auth.role() = 'authenticated');
-              
-            CREATE POLICY "Allow update for authenticated users" 
-              ON contact_messages_despi_9a7b3c4d2e FOR UPDATE 
-              USING (auth.role() = 'authenticated')
-              WITH CHECK (auth.role() = 'authenticated');
-              
-            CREATE POLICY "Allow delete for authenticated users" 
-              ON contact_messages_despi_9a7b3c4d2e FOR DELETE 
-              USING (auth.role() = 'authenticated');
-            
-            -- Create policy for anonymous users to insert messages
-            CREATE POLICY "Allow insert for anonymous users" 
-              ON contact_messages_despi_9a7b3c4d2e FOR INSERT 
-              WITH CHECK (true);
-          `;
-          
-          await supabase.rpc('execute_sql', { query: createMessagesTableQuery });
-          setDebugInfo(prevInfo => prevInfo + '\ncontact_messages table created successfully!');
-        } else {
-          setDebugInfo(prevInfo => prevInfo + '\ncontact_messages table already exists.');
-        }
-      } catch (messagesError) {
-        setDebugInfo(prevInfo => prevInfo + '\nError checking contact_messages table: ' + JSON.stringify(messagesError));
-      }
-      
-      // Check if bio_timeline table exists
-      try {
-        const { data: bioTableCheck, error: bioTableError } = await supabase
-          .from('bio_timeline_despi_9a7b3c4d2e')
-          .select('id')
-          .limit(1);
-        
-        if (bioTableError && bioTableError.code === 'PGRST116') {
-          setDebugInfo(prevInfo => prevInfo + '\nCreating bio_timeline table...');
-          
-          // Create bio_timeline table if it doesn't exist
-          const createBioTableQuery = `
-            CREATE TABLE IF NOT EXISTS bio_timeline_despi_9a7b3c4d2e (
-              id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-              year INTEGER NOT NULL,
-              description TEXT NOT NULL,
-              sort_order INTEGER DEFAULT 0,
-              is_active BOOLEAN DEFAULT TRUE,
-              created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-              updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
-            
-            -- Enable Row Level Security
-            ALTER TABLE bio_timeline_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-            
-            -- Create policies
-            CREATE POLICY "Allow all operations for authenticated users" 
-              ON bio_timeline_despi_9a7b3c4d2e
-              USING (auth.role() = 'authenticated')
-              WITH CHECK (auth.role() = 'authenticated');
-          `;
-          
-          await supabase.rpc('execute_sql', { query: createBioTableQuery });
-          setDebugInfo(prevInfo => prevInfo + '\nbio_timeline table created successfully!');
-          
-          // Insert sample data
-          const sampleData = [
-            { year: 2013, description: "Despi is born on April 2nd in Chania, Greece", sort_order: 0, is_active: true },
-            { year: 2018, description: "Started playing football at local youth club", sort_order: 1, is_active: true },
-            { year: 2020, description: "Joined K10 of Finikas Italian Academy", sort_order: 2, is_active: true },
-            { year: 2022, description: "Selected for regional youth talent program", sort_order: 3, is_active: true },
-            { year: 2023, description: "Won best young player award in local tournament", sort_order: 4, is_active: true }
-          ];
-          
-          await supabase
-            .from('bio_timeline_despi_9a7b3c4d2e')
-            .insert(sampleData);
-          
-          setDebugInfo(prevInfo => prevInfo + '\nSample bio data inserted successfully!');
-        } else {
-          setDebugInfo(prevInfo => prevInfo + '\nbio_timeline table already exists.');
-        }
-      } catch (bioError) {
-        setDebugInfo(prevInfo => prevInfo + '\nError checking bio_timeline table: ' + JSON.stringify(bioError));
-      }
-      
-      // Continue with other tables...
-      setDebugInfo(prevInfo => prevInfo + '\nAll tables checked/created successfully!');
-    } catch (error) {
-      console.error('Error ensuring tables exist:', error);
-      setDebugInfo(prevInfo => prevInfo + '\nError ensuring tables exist: ' + JSON.stringify(error));
-    }
-  };
-
   const fetchData = async () => {
     setIsLoading(true);
-    
-    // First ensure all necessary tables exist
-    await ensureTablesExist();
     
     try {
       if (activeTab === 'messages') {
         try {
-          setDebugInfo(prevInfo => prevInfo + '\nFetching messages...');
+          setDebugInfo('Fetching messages...');
           
-          // Check if table exists first
-          const { data: tableCheck, error: tableCheckError } = await supabase
+          // Use a simpler query to check if table exists and get messages
+          const { data, error } = await supabase
             .from('contact_messages_despi_9a7b3c4d2e')
-            .select('count(*)')
-            .single();
-            
-          if (tableCheckError && tableCheckError.code === 'PGRST116') {
-            setDebugInfo(prevInfo => prevInfo + '\nMessages table does not exist.');
-            setMessages([]);
-          } else {
-            // Table exists, get the messages
-            const { data, error } = await supabase
-              .from('contact_messages_despi_9a7b3c4d2e')
-              .select('*')
-              .order('created_at', { ascending: false });
+            .select('*')
+            .order('created_at', { ascending: false });
 
-            if (error) {
-              setDebugInfo(prevInfo => prevInfo + '\nError fetching messages: ' + JSON.stringify(error));
+          if (error) {
+            if (error.code === 'PGRST116') {
+              setDebugInfo('Messages table does not exist. Creating it...');
+              // Table doesn't exist, we'll show the empty state
+              setMessages([]);
+            } else {
               throw error;
             }
-            
-            setDebugInfo(prevInfo => prevInfo + '\nMessages fetched: ' + (data ? data.length : 0));
+          } else {
+            setDebugInfo(`Messages fetched successfully: ${data ? data.length : 0}`);
             setMessages(data || []);
           }
         } catch (messagesError) {
           console.error('Error fetching messages:', messagesError);
-          setDebugInfo(prevInfo => prevInfo + '\nCaught error fetching messages: ' + JSON.stringify(messagesError));
+          setDebugInfo('Error fetching messages: ' + messagesError.message);
           setMessages([]);
         }
       } else if (activeTab === 'pending') {
-        // Check if gallery_images table exists
-        const { data: galleryTableCheck, error: galleryTableError } = await supabase
-          .from('gallery_images_despi_9a7b3c4d2e')
-          .select('id')
-          .limit(1);
-        
-        if (!galleryTableError) {
+        try {
           const { data, error } = await supabase
             .from('gallery_images_despi_9a7b3c4d2e')
             .select('*')
             .eq('is_approved', false)
             .order('created_at', { ascending: false });
-  
-          if (error) throw error;
+
+          if (error && error.code !== 'PGRST116') throw error;
           setPendingImages(data || []);
-        } else {
+        } catch (error) {
+          console.error('Error fetching pending images:', error);
           setPendingImages([]);
         }
       } else if (activeTab === 'hero') {
-        const { data, error } = await supabase
-          .from('hero_content_despi_9a7b3c4d2e')
-          .select('*')
-          .limit(1)
-          .single();
+        try {
+          const { data, error } = await supabase
+            .from('hero_content_despi_9a7b3c4d2e')
+            .select('*')
+            .limit(1)
+            .single();
 
-        if (error && error.code !== 'PGRST116') throw error;
-        if (data) setHeroContent(data);
+          if (error && error.code !== 'PGRST116') throw error;
+          if (data) setHeroContent(data);
+        } catch (error) {
+          console.error('Error fetching hero content:', error);
+        }
       } else if (activeTab === 'bio') {
-        const { data, error } = await supabase
-          .from('bio_timeline_despi_9a7b3c4d2e')
-          .select('*')
-          .order('sort_order', { ascending: true });
+        try {
+          const { data, error } = await supabase
+            .from('bio_timeline_despi_9a7b3c4d2e')
+            .select('*')
+            .order('sort_order', { ascending: true });
 
-        if (error && error.code !== 'PGRST116') throw error;
-        setBioTimeline(data || []);
+          if (error && error.code !== 'PGRST116') throw error;
+          setBioTimeline(data || []);
+        } catch (error) {
+          console.error('Error fetching bio timeline:', error);
+          setBioTimeline([]);
+        }
       } else if (activeTab === 'gallery') {
-        // Check if gallery_images table exists
-        const { data: galleryTableCheck, error: galleryTableError } = await supabase
-          .from('gallery_images_despi_9a7b3c4d2e')
-          .select('id')
-          .limit(1);
-        
-        if (!galleryTableError) {
+        try {
           const { data, error } = await supabase
             .from('gallery_images_despi_9a7b3c4d2e')
             .select('*')
             .eq('is_approved', true)
             .order('sort_order', { ascending: true });
-  
-          if (error) throw error;
+
+          if (error && error.code !== 'PGRST116') throw error;
           setGalleryImages(data || []);
-        } else {
+        } catch (error) {
+          console.error('Error fetching gallery images:', error);
           setGalleryImages([]);
         }
       } else if (activeTab === 'videos') {
-        // Check if videos table exists
-        const { data: videosTableCheck, error: videosTableError } = await supabase
-          .from('videos_despi_9a7b3c4d2e')
-          .select('id')
-          .limit(1);
-        
-        if (!videosTableError) {
+        try {
           const { data, error } = await supabase
             .from('videos_despi_9a7b3c4d2e')
             .select('*')
             .order('created_at', { ascending: false });
-  
-          if (error) throw error;
+
+          if (error && error.code !== 'PGRST116') throw error;
           const filteredVideos = (data || []).filter(video => 
             !video.title.toLowerCase().includes('music') && 
             !video.description.toLowerCase().includes('music') && 
             video.youtube_id !== 'dQw4w9WgXcQ'
           );
           setVideos(filteredVideos);
-        } else {
+        } catch (error) {
+          console.error('Error fetching videos:', error);
           setVideos([]);
         }
       } else if (activeTab === 'settings') {
-        const { data, error } = await supabase
-          .from('admin_settings_despi_9a7b3c4d2e')
-          .select('*');
+        try {
+          const { data, error } = await supabase
+            .from('admin_settings_despi_9a7b3c4d2e')
+            .select('*');
 
-        if (error && error.code !== 'PGRST116') throw error;
+          if (error && error.code !== 'PGRST116') throw error;
 
-        const settingsObj = {};
-        (data || []).forEach(setting => {
-          settingsObj[setting.setting_key] = setting.setting_value;
-        });
+          const settingsObj = {};
+          (data || []).forEach(setting => {
+            settingsObj[setting.setting_key] = setting.setting_value;
+          });
 
-        setSettings({
-          recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
-          recaptcha_site_key: settingsObj.recaptcha_site_key || '',
-          recaptcha_secret_key: settingsObj.recaptcha_secret_key || '',
-          notification_emails: settingsObj.notification_emails || 'despihania@gmail.com',
-          email_notifications_enabled: settingsObj.email_notifications_enabled !== 'false',
-          email_from_address: settingsObj.email_from_address || 'noreply@asvesta.eu',
-          social_youtube_url: settingsObj.social_youtube_url || 'https://www.youtube.com/@despi5740',
-          social_instagram_url: settingsObj.social_instagram_url || 'https://instagram.com/despi_football',
-          social_facebook_url: settingsObj.social_facebook_url || 'https://facebook.com/despi.football'
-        });
+          setSettings({
+            recaptcha_enabled: settingsObj.recaptcha_enabled === 'true',
+            recaptcha_site_key: settingsObj.recaptcha_site_key || '',
+            recaptcha_secret_key: settingsObj.recaptcha_secret_key || '',
+            notification_emails: settingsObj.notification_emails || 'despihania@gmail.com',
+            email_notifications_enabled: settingsObj.email_notifications_enabled !== 'false',
+            email_from_address: settingsObj.email_from_address || 'noreply@asvesta.eu',
+            social_youtube_url: settingsObj.social_youtube_url || 'https://www.youtube.com/@despi5740',
+            social_instagram_url: settingsObj.social_instagram_url || 'https://instagram.com/despi_football',
+            social_facebook_url: settingsObj.social_facebook_url || 'https://facebook.com/despi.football'
+          });
+        } catch (error) {
+          console.error('Error fetching settings:', error);
+        }
       }
     } catch (error) {
       console.error(`Error fetching ${activeTab} data:`, error);
-      setDebugInfo(prevInfo => prevInfo + `\nError fetching ${activeTab} data: ` + JSON.stringify(error));
+      setDebugInfo(`Error fetching ${activeTab} data: ` + error.message);
     } finally {
       setIsLoading(false);
     }
@@ -397,57 +264,19 @@ const AdminPage = () => {
       
     } catch (supabaseError) {
       console.error('Supabase Edge Function failed:', supabaseError);
-      setEmailTestResult('❌ Supabase Edge Function failed: ' + supabaseError.message);
-      
-      // Try fallback method using direct API call
-      try {
-        setEmailTestResult(prev => prev + '\n\nTrying fallback method...');
-        
-        const fallbackResponse = await fetch('/api/send-email-fallback', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            to: settings.notification_emails.split(',')[0].trim(),
-            subject: 'Test Email from Despi\'s Website (Fallback)',
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                <div style="background: linear-gradient(135deg, #16a34a, #22c55e); color: white; padding: 20px; border-radius: 10px;">
-                  <h1 style="margin: 0;">Test Email (Fallback)</h1>
-                  <p style="margin: 10px 0 0 0;">This is a test email sent via fallback method.</p>
-                </div>
-                <div style="padding: 20px; background: #f8f9fa; border-radius: 0 0 10px 10px;">
-                  <p>This email was sent using the fallback method because the Supabase Edge Function is not available.</p>
-                  <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
-                    Sent at: ${new Date().toLocaleString()}
-                  </p>
-                </div>
-              </div>
-            `
-          })
-        });
-
-        if (fallbackResponse.ok) {
-          setEmailTestResult(prev => prev + '\n✅ Fallback method successful!');
-        } else {
-          throw new Error('Fallback method also failed');
-        }
-        
-      } catch (fallbackError) {
-        console.error('Fallback method failed:', fallbackError);
-        setEmailTestResult(prev => prev + '\n❌ All email methods failed. Please check:\n' +
-          '1. Supabase Edge Function is deployed\n' +
-          '2. RESEND_API_KEY is set in Supabase secrets\n' +
-          '3. From email is verified in Resend\n' +
-          '4. CORS headers are properly configured');
-      }
+      setEmailTestResult('❌ Supabase Edge Function failed: ' + supabaseError.message + 
+        '\n\nPossible issues:\n' +
+        '1. Edge Function not deployed: Run `supabase functions deploy send-email`\n' +
+        '2. RESEND_API_KEY not set in Supabase secrets\n' +
+        '3. From email not verified in Resend account\n' +
+        '4. CORS configuration error\n\n' +
+        'The contact form will still save messages to the database, but email notifications won\'t work until this is fixed.');
     }
     
-    // Clear the result after 10 seconds
+    // Clear the result after 15 seconds
     setTimeout(() => {
       setEmailTestResult('');
-    }, 10000);
+    }, 15000);
   };
 
   const approveImage = async (imageId) => {
@@ -583,33 +412,6 @@ const AdminPage = () => {
 
       const youtubeId = extractYoutubeId(currentVideo.url);
       const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : '';
-
-      // Check if videos table exists
-      const { data: videosTableCheck, error: videosTableError } = await supabase
-        .from('videos_despi_9a7b3c4d2e')
-        .select('id')
-        .limit(1);
-      
-      if (videosTableError && videosTableError.code === 'PGRST116') {
-        // Create videos table if it doesn't exist
-        const createVideosTableQuery = `
-          CREATE TABLE IF NOT EXISTS videos_despi_9a7b3c4d2e (
-            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-            title TEXT NOT NULL,
-            description TEXT,
-            url TEXT NOT NULL,
-            youtube_id TEXT,
-            thumbnail_url TEXT,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-          );
-          ALTER TABLE videos_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-          CREATE POLICY "Allow all operations for authenticated users" ON videos_despi_9a7b3c4d2e
-            USING (auth.role() = 'authenticated')
-            WITH CHECK (auth.role() = 'authenticated');
-        `;
-        
-        await supabase.rpc('execute_sql', { query: createVideosTableQuery });
-      }
 
       const { error } = await supabase
         .from('videos_despi_9a7b3c4d2e')
@@ -748,10 +550,7 @@ const AdminPage = () => {
 
   const createSampleMessage = async () => {
     try {
-      setDebugInfo(prevInfo => prevInfo + '\nCreating sample message...');
-      
-      // First ensure contact_messages table exists
-      await ensureTablesExist();
+      setDebugInfo('Creating sample message...');
       
       // Add a sample message
       const sampleMessage = {
@@ -769,29 +568,13 @@ const AdminPage = () => {
         
       if (error) throw error;
       
-      setDebugInfo(prevInfo => prevInfo + '\nSample message created: ' + JSON.stringify(data));
+      setDebugInfo('Sample message created successfully: ' + JSON.stringify(data));
       fetchData();
       alert('Sample message added!');
     } catch (error) {
       console.error('Error adding sample message:', error);
-      setDebugInfo(prevInfo => prevInfo + '\nError adding sample message: ' + JSON.stringify(error));
+      setDebugInfo('Error adding sample message: ' + error.message);
       alert('Error adding sample message. Please try again.');
-    }
-  };
-
-  const checkPolicies = async () => {
-    try {
-      setDebugInfo(prevInfo => prevInfo + '\nChecking policies...');
-      
-      const { data, error } = await supabase.rpc('execute_sql', {
-        query: "SELECT * FROM pg_policies WHERE tablename = 'contact_messages_despi_9a7b3c4d2e';"
-      });
-      
-      if (error) throw error;
-      
-      setDebugInfo(prevInfo => prevInfo + '\nPolicies: ' + JSON.stringify(data));
-    } catch (error) {
-      setDebugInfo(prevInfo => prevInfo + '\nError checking policies: ' + JSON.stringify(error));
     }
   };
 
@@ -815,14 +598,6 @@ const AdminPage = () => {
           >
             <SafeIcon icon={FiPlus} className="w-4 h-4" />
             Add Sample
-          </button>
-          
-          <button
-            onClick={checkPolicies}
-            className="px-3 py-1 bg-yellow-600 text-white rounded hover:bg-yellow-700 flex items-center gap-1"
-          >
-            <SafeIcon icon={FiEye} className="w-4 h-4" />
-            Check Policies
           </button>
         </div>
       </div>
@@ -1082,33 +857,6 @@ const AdminPage = () => {
                 <SafeIcon icon={FiClock} className="w-5 h-5" />
                 No bio items yet. Add your first bio item using the "Add Bio Item" button above.
               </p>
-              <button 
-                onClick={() => {
-                  // Add sample bio items
-                  const sampleData = [
-                    { year: 2013, description: "Despi is born on April 2nd in Chania, Greece", sort_order: 0, is_active: true },
-                    { year: 2018, description: "Started playing football at local youth club", sort_order: 1, is_active: true },
-                    { year: 2020, description: "Joined K10 of Finikas Italian Academy", sort_order: 2, is_active: true },
-                    { year: 2022, description: "Selected for regional youth talent program", sort_order: 3, is_active: true },
-                    { year: 2023, description: "Won best young player award in local tournament", sort_order: 4, is_active: true }
-                  ];
-                  
-                  Promise.all(sampleData.map(item => 
-                    supabase
-                      .from('bio_timeline_despi_9a7b3c4d2e')
-                      .insert([item])
-                  )).then(() => {
-                    fetchData();
-                    alert('Sample bio items added successfully!');
-                  }).catch(error => {
-                    console.error('Error adding sample bio items:', error);
-                    alert('Error adding sample bio items. Please try again.');
-                  });
-                }}
-                className="mt-3 text-sm bg-yellow-100 hover:bg-yellow-200 px-4 py-2 rounded-md text-yellow-800 transition-colors"
-              >
-                Add Sample Bio Items
-              </button>
             </div>
           ) : (
             bioTimeline.map((item) => (
@@ -1289,23 +1037,6 @@ const AdminPage = () => {
           {videos.length === 0 ? (
             <div className="col-span-full bg-blue-50 p-4 rounded-lg border border-blue-200 text-blue-800">
               <p>No videos yet. Add your first video using the "Add Video" button above.</p>
-              <button 
-                onClick={() => {
-                  // Add a sample video
-                  const sampleVideo = {
-                    title: 'Amazing Skills Showcase',
-                    description: 'Watch Despi demonstrate her incredible football skills and techniques',
-                    url: 'https://www.youtube.com/watch?v=6sfCZhgX5jA',
-                  };
-                  
-                  // Set the current video data
-                  setCurrentVideo(sampleVideo);
-                  setIsEditing(true);
-                }}
-                className="mt-3 text-sm bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-md text-blue-800 transition-colors"
-              >
-                Add Sample Video
-              </button>
             </div>
           ) : (
             videos.map((video) => (
@@ -1581,33 +1312,6 @@ const AdminPage = () => {
         <button
           onClick={async () => {
             try {
-              // Check if hero_content table exists
-              const { data: heroTableCheck, error: heroTableError } = await supabase
-                .from('hero_content_despi_9a7b3c4d2e')
-                .select('id')
-                .limit(1);
-                
-              if (heroTableError && heroTableError.code === 'PGRST116') {
-                // Create hero_content table if it doesn't exist
-                const createHeroTableQuery = `
-                  CREATE TABLE IF NOT EXISTS hero_content_despi_9a7b3c4d2e (
-                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                    title TEXT NOT NULL,
-                    subtitle TEXT,
-                    buttonText TEXT,
-                    buttonLink TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-                  );
-                  ALTER TABLE hero_content_despi_9a7b3c4d2e ENABLE ROW LEVEL SECURITY;
-                  CREATE POLICY "Allow all operations for authenticated users" ON hero_content_despi_9a7b3c4d2e
-                    USING (auth.role() = 'authenticated')
-                    WITH CHECK (auth.role() = 'authenticated');
-                `;
-                
-                await supabase.rpc('execute_sql', { query: createHeroTableQuery });
-              }
-
               const { data: existingData, error: checkError } = await supabase
                 .from('hero_content_despi_9a7b3c4d2e')
                 .select('id')
