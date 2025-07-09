@@ -43,6 +43,7 @@ const AdminPage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
+  const [emailTestResult, setEmailTestResult] = useState('');
   const [currentVideo, setCurrentVideo] = useState({
     title: '',
     description: '',
@@ -363,7 +364,10 @@ const AdminPage = () => {
   };
 
   const testEmailFunction = async () => {
+    setEmailTestResult('Testing email function...');
+    
     try {
+      // First try the Supabase Edge Function
       const { data, error } = await supabase.functions.invoke('send-email', {
         body: {
           to: settings.notification_emails.split(',')[0].trim(),
@@ -386,14 +390,64 @@ const AdminPage = () => {
       });
 
       if (error) {
-        alert('Error sending test email: ' + error.message);
-      } else {
-        alert('Test email sent successfully!');
+        throw error;
       }
-    } catch (error) {
-      console.error('Error testing email function:', error);
-      alert('Error testing email function: ' + error.message);
+
+      setEmailTestResult('✅ Test email sent successfully via Supabase Edge Function!');
+      
+    } catch (supabaseError) {
+      console.error('Supabase Edge Function failed:', supabaseError);
+      setEmailTestResult('❌ Supabase Edge Function failed: ' + supabaseError.message);
+      
+      // Try fallback method using direct API call
+      try {
+        setEmailTestResult(prev => prev + '\n\nTrying fallback method...');
+        
+        const fallbackResponse = await fetch('/api/send-email-fallback', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            to: settings.notification_emails.split(',')[0].trim(),
+            subject: 'Test Email from Despi\'s Website (Fallback)',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                <div style="background: linear-gradient(135deg, #16a34a, #22c55e); color: white; padding: 20px; border-radius: 10px;">
+                  <h1 style="margin: 0;">Test Email (Fallback)</h1>
+                  <p style="margin: 10px 0 0 0;">This is a test email sent via fallback method.</p>
+                </div>
+                <div style="padding: 20px; background: #f8f9fa; border-radius: 0 0 10px 10px;">
+                  <p>This email was sent using the fallback method because the Supabase Edge Function is not available.</p>
+                  <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+                    Sent at: ${new Date().toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            `
+          })
+        });
+
+        if (fallbackResponse.ok) {
+          setEmailTestResult(prev => prev + '\n✅ Fallback method successful!');
+        } else {
+          throw new Error('Fallback method also failed');
+        }
+        
+      } catch (fallbackError) {
+        console.error('Fallback method failed:', fallbackError);
+        setEmailTestResult(prev => prev + '\n❌ All email methods failed. Please check:\n' +
+          '1. Supabase Edge Function is deployed\n' +
+          '2. RESEND_API_KEY is set in Supabase secrets\n' +
+          '3. From email is verified in Resend\n' +
+          '4. CORS headers are properly configured');
+      }
     }
+    
+    // Clear the result after 10 seconds
+    setTimeout(() => {
+      setEmailTestResult('');
+    }, 10000);
   };
 
   const approveImage = async (imageId) => {
@@ -1356,6 +1410,13 @@ const AdminPage = () => {
             <p className="text-xs text-gray-500 mt-2">
               Send a test email to verify your email configuration is working
             </p>
+            
+            {emailTestResult && (
+              <div className="mt-4 p-3 bg-gray-50 rounded-md">
+                <h5 className="font-medium mb-2">Test Results:</h5>
+                <pre className="text-xs whitespace-pre-wrap">{emailTestResult}</pre>
+              </div>
+            )}
           </div>
         </div>
       </div>
