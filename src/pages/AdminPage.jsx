@@ -44,7 +44,8 @@ const AdminPage = () => {
     title: '',
     description: '',
     url: '',
-    thumbnail_url: ''
+    thumbnail_url: '',
+    featured_in_about: false
   });
   const [currentImage, setCurrentImage] = useState({
     id: null,
@@ -61,6 +62,7 @@ const AdminPage = () => {
   });
   const [showImageUploader, setShowImageUploader] = useState(false);
   const [editingImageId, setEditingImageId] = useState(null);
+  const [editingVideoId, setEditingVideoId] = useState(null);
 
   const tabs = [
     { id: 'messages', label: 'Messages', icon: FiMessageSquare },
@@ -383,6 +385,32 @@ const AdminPage = () => {
     }
   };
 
+  const toggleVideoFeaturedInAbout = async (videoId, currentFeatured) => {
+    try {
+      // If we're featuring this video, unfeature any currently featured video
+      if (!currentFeatured) {
+        await supabase
+          .from('videos_despi_9a7b3c4d2e')
+          .update({ featured_in_about: false })
+          .neq('id', videoId);
+      }
+
+      const { error } = await supabase
+        .from('videos_despi_9a7b3c4d2e')
+        .update({ featured_in_about: !currentFeatured })
+        .eq('id', videoId);
+
+      if (error) throw error;
+      fetchData();
+      alert(currentFeatured 
+        ? 'Video removed from About section' 
+        : 'Video now featured in About section');
+    } catch (error) {
+      console.error('Error updating video:', error);
+      alert('Error updating video. Please try again.');
+    }
+  };
+
   const moveImageUp = async (imageId, currentOrder) => {
     try {
       // Find the image with the previous sort order
@@ -459,6 +487,19 @@ const AdminPage = () => {
     setEditingImageId(image.id);
   };
 
+  const startEditVideo = (video) => {
+    setCurrentVideo({
+      id: video.id,
+      title: video.title, 
+      description: video.description,
+      url: video.url,
+      youtube_id: video.youtube_id,
+      thumbnail_url: video.thumbnail_url,
+      featured_in_about: video.featured_in_about || false
+    });
+    setEditingVideoId(video.id);
+  };
+
   const cancelEditImage = () => {
     setCurrentImage({
       id: null,
@@ -469,6 +510,17 @@ const AdminPage = () => {
       sort_order: 0
     });
     setEditingImageId(null);
+  };
+
+  const cancelEditVideo = () => {
+    setCurrentVideo({
+      title: '',
+      description: '',
+      url: '',
+      thumbnail_url: '',
+      featured_in_about: false
+    });
+    setEditingVideoId(null);
   };
 
   const saveImageEdit = async () => {
@@ -498,6 +550,56 @@ const AdminPage = () => {
     } catch (error) {
       console.error('Error updating image:', error);
       alert('Error updating image. Please try again.');
+    }
+  };
+
+  const saveVideoEdit = async () => {
+    if (!currentVideo.title || !currentVideo.url) {
+      alert('Please fill in title and URL');
+      return;
+    }
+
+    try {
+      const extractYoutubeId = (url) => {
+        const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+        const match = url.match(regExp);
+        return (match && match[2].length === 11) ? match[2] : null;
+      };
+
+      const youtubeId = extractYoutubeId(currentVideo.url) || currentVideo.youtube_id;
+      const thumbnailUrl = youtubeId 
+        ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` 
+        : currentVideo.thumbnail_url;
+
+      const { error } = await supabase
+        .from('videos_despi_9a7b3c4d2e')
+        .update({
+          title: currentVideo.title,
+          description: currentVideo.description,
+          url: currentVideo.url,
+          youtube_id: youtubeId,
+          thumbnail_url: thumbnailUrl,
+          featured_in_about: currentVideo.featured_in_about,
+          updated_at: new Date()
+        })
+        .eq('id', currentVideo.id);
+
+      if (error) throw error;
+
+      // If this video is being featured in about, unfeature any other videos
+      if (currentVideo.featured_in_about) {
+        await supabase
+          .from('videos_despi_9a7b3c4d2e')
+          .update({ featured_in_about: false })
+          .neq('id', currentVideo.id);
+      }
+
+      cancelEditVideo();
+      fetchData();
+      alert('Video updated successfully!');
+    } catch (error) {
+      console.error('Error updating video:', error);
+      alert('Error updating video. Please try again.');
     }
   };
 
@@ -584,6 +686,13 @@ const AdminPage = () => {
       const youtubeId = extractYoutubeId(currentVideo.url);
       const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : '';
 
+      // If this video is being featured in about, unfeature any other videos
+      if (currentVideo.featured_in_about) {
+        await supabase
+          .from('videos_despi_9a7b3c4d2e')
+          .update({ featured_in_about: false });
+      }
+
       const { error } = await supabase
         .from('videos_despi_9a7b3c4d2e')
         .insert([{
@@ -599,7 +708,8 @@ const AdminPage = () => {
         title: '',
         description: '',
         url: '',
-        thumbnail_url: ''
+        thumbnail_url: '',
+        featured_in_about: false
       });
       fetchData();
       alert('Video added successfully!');
@@ -1404,6 +1514,18 @@ const AdminPage = () => {
                 placeholder="https://www.youtube.com/watch?v=..."
               />
             </div>
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                id="featured_in_about"
+                checked={currentVideo.featured_in_about}
+                onChange={(e) => setCurrentVideo({ ...currentVideo, featured_in_about: e.target.checked })}
+                className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+              />
+              <label htmlFor="featured_in_about" className="text-sm font-medium text-gray-700">
+                Feature in About Section (replaces static image)
+              </label>
+            </div>
             <div className="flex gap-3">
               <button
                 onClick={addVideo}
@@ -1433,35 +1555,114 @@ const AdminPage = () => {
           ) : (
             videos.map((video) => (
               <div key={video.id} className="bg-white p-4 rounded-lg shadow">
-                <div className="relative mb-3">
-                  <img
-                    src={video.thumbnail_url || 'https://via.placeholder.com/200x113?text=Video'}
-                    alt={video.title}
-                    className="w-full h-32 object-cover rounded"
-                  />
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                    <SafeIcon icon={FiVideo} className="text-white w-8 h-8" />
+                {editingVideoId === video.id ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Title</label>
+                      <input
+                        type="text"
+                        value={currentVideo.title}
+                        onChange={(e) => setCurrentVideo({ ...currentVideo, title: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Description</label>
+                      <textarea
+                        value={currentVideo.description}
+                        onChange={(e) => setCurrentVideo({ ...currentVideo, description: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                        rows="2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">YouTube URL</label>
+                      <input
+                        type="url"
+                        value={currentVideo.url}
+                        onChange={(e) => setCurrentVideo({ ...currentVideo, url: e.target.value })}
+                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id={`featured-about-${video.id}`}
+                        checked={currentVideo.featured_in_about}
+                        onChange={(e) => setCurrentVideo({ ...currentVideo, featured_in_about: e.target.checked })}
+                        className="w-3 h-3 text-green-600 rounded focus:ring-green-500"
+                      />
+                      <label htmlFor={`featured-about-${video.id}`} className="text-xs text-gray-700">
+                        Featured in About
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={saveVideoEdit}
+                        className="px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={cancelEditVideo}
+                        className="px-2 py-1 bg-gray-600 text-white text-xs rounded hover:bg-gray-700"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <h4 className="font-medium mb-2">{video.title}</h4>
-                <p className="text-sm text-gray-600 mb-3">{video.description}</p>
-                <div className="flex gap-2">
-                  <a
-                    href={video.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
-                  >
-                    <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
-                    View
-                  </a>
-                  <button
-                    onClick={() => deleteVideo(video.id)}
-                    className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
-                  >
-                    Delete
-                  </button>
-                </div>
+                ) : (
+                  <>
+                    <div className="relative mb-3">
+                      <img
+                        src={video.thumbnail_url || 'https://via.placeholder.com/200x113?text=Video'}
+                        alt={video.title}
+                        className="w-full h-32 object-cover rounded"
+                      />
+                      <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                        <SafeIcon icon={FiVideo} className="text-white w-8 h-8" />
+                      </div>
+                      {video.featured_in_about && (
+                        <span className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
+                          <SafeIcon icon={FiStar} className="w-3 h-3 inline mr-1" />
+                          In About
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-medium mb-2">{video.title}</h4>
+                    <p className="text-sm text-gray-600 mb-3">{video.description}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={video.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
+                        View
+                      </a>
+                      <button
+                        onClick={() => startEditVideo(video)}
+                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700 flex items-center gap-1"
+                      >
+                        <SafeIcon icon={FiEdit} className="w-3 h-3" />
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => toggleVideoFeaturedInAbout(video.id, video.featured_in_about)}
+                        className={`px-3 py-1 text-xs rounded ${video.featured_in_about ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}
+                      >
+                        {video.featured_in_about ? 'Remove from About' : 'Show in About'}
+                      </button>
+                      <button
+                        onClick={() => deleteVideo(video.id)}
+                        className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             ))
           )}

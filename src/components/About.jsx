@@ -1,16 +1,19 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import SafeIcon from '../common/SafeIcon';
 import * as FiIcons from 'react-icons/fi';
+import supabase from '../lib/supabase';
 
-const { FiMapPin, FiCalendar, FiTrendingUp, FiHeart } = FiIcons;
+const { FiMapPin, FiCalendar, FiTrendingUp, FiHeart, FiPlay } = FiIcons;
 
 const About = () => {
   // Calculate Despi's age dynamically based on her birthdate (02/04/2013)
+  const [featuredVideo, setFeaturedVideo] = useState(null);
+  const [showVideo, setShowVideo] = useState(false);
+  
   const calculateAge = () => {
     const birthDate = new Date('2013-04-02'); // YYYY-MM-DD format
     const today = new Date();
-    
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDifference = today.getMonth() - birthDate.getMonth();
     
@@ -18,32 +21,50 @@ const About = () => {
     if (monthDifference < 0 || (monthDifference === 0 && today.getDate() < birthDate.getDate())) {
       age--;
     }
-    
     return age;
   };
 
+  useEffect(() => {
+    const fetchFeaturedVideo = async () => {
+      try {
+        // Fetch a video marked as featured_in_about = true
+        const { data, error } = await supabase
+          .from('videos_despi_9a7b3c4d2e')
+          .select('*')
+          .eq('featured_in_about', true)
+          .limit(1)
+          .single();
+
+        if (error && error.code !== 'PGRST116') {
+          console.error('Error fetching featured video:', error);
+          return;
+        }
+
+        if (data) {
+          setFeaturedVideo(data);
+        }
+      } catch (error) {
+        console.error('Error in fetchFeaturedVideo:', error);
+      }
+    };
+
+    fetchFeaturedVideo();
+  }, []);
+
   const stats = [
-    {
-      icon: FiMapPin,
-      label: 'From',
-      value: 'Chania, Greece'
-    },
-    {
-      icon: FiCalendar,
-      label: 'Age',
-      value: `${calculateAge()} Years Old`
-    },
-    {
-      icon: FiTrendingUp,
-      label: 'Position',
-      value: 'Forward'
-    },
-    {
-      icon: FiHeart,
-      label: 'Passion',
-      value: 'Football'
-    }
+    { icon: FiMapPin, label: 'From', value: 'Chania, Greece' },
+    { icon: FiCalendar, label: 'Age', value: `${calculateAge()} Years Old` },
+    { icon: FiTrendingUp, label: 'Position', value: 'Forward' },
+    { icon: FiHeart, label: 'Passion', value: 'Football' }
   ];
+
+  // Function to extract YouTube video ID from URL
+  const getYoutubeVideoId = (url) => {
+    if (!url) return null;
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : null;
+  };
 
   return (
     <section id="about" className="py-20 bg-white">
@@ -67,12 +88,39 @@ const About = () => {
             initial={{ opacity: 0, x: -50 }}
             whileInView={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8 }}
+            className="relative"
           >
-            <img
-              src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962901891-blob"
-              alt="Despi training"
-              className="rounded-2xl shadow-2xl w-full h-[500px] object-cover"
-            />
+            {featuredVideo && showVideo ? (
+              <div className="relative rounded-2xl shadow-2xl overflow-hidden w-full h-[500px]">
+                <iframe
+                  src={`https://www.youtube.com/embed/${getYoutubeVideoId(featuredVideo.url) || featuredVideo.youtube_id}?autoplay=1`}
+                  title={featuredVideo.title}
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                  className="w-full h-full absolute inset-0"
+                ></iframe>
+              </div>
+            ) : (
+              <div className="relative">
+                <img 
+                  src="https://quest-media-storage-bucket.s3.us-east-2.amazonaws.com/1751962901891-blob" 
+                  alt="Despi training" 
+                  className="rounded-2xl shadow-2xl w-full h-[500px] object-cover" 
+                />
+                
+                {featuredVideo && (
+                  <button
+                    onClick={() => setShowVideo(true)}
+                    className="absolute inset-0 flex items-center justify-center bg-black/30 rounded-2xl transition-opacity hover:bg-black/40"
+                  >
+                    <div className="bg-white/90 p-5 rounded-full shadow-lg transform transition-transform hover:scale-110">
+                      <SafeIcon icon={FiPlay} className="text-green-600 w-8 h-8" />
+                    </div>
+                    <span className="sr-only">Play Video</span>
+                  </button>
+                )}
+              </div>
+            )}
           </motion.div>
 
           <motion.div
