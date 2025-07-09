@@ -8,18 +8,11 @@ import ReCAPTCHA from 'react-google-recaptcha';
 const { FiMail, FiPhone, FiMapPin, FiYoutube, FiInstagram, FiFacebook, FiCheck } = FiIcons;
 
 const Contact = () => {
-  const [form, setForm] = useState({
-    name: '',
-    email: '',
-    message: ''
-  });
+  const [form, setForm] = useState({ name: '', email: '', message: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitSuccess, setSubmitSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
-  const [recaptchaSettings, setRecaptchaSettings] = useState({
-    enabled: false,
-    siteKey: ''
-  });
+  const [recaptchaSettings, setRecaptchaSettings] = useState({ enabled: false, siteKey: '' });
   const [recaptchaValue, setRecaptchaValue] = useState(null);
   const [socialLinks, setSocialLinks] = useState({
     youtube: 'https://www.youtube.com/@despi5740',
@@ -167,7 +160,8 @@ const Contact = () => {
       // Send email to each recipient
       for (const email of emailList) {
         try {
-          const { data, error } = await supabase.functions.invoke('send-email', {
+          // Updated to use the renamed function and add proper authorization
+          const { data, error } = await supabase.functions.invoke('resend-email', {
             body: {
               to: email,
               subject: `New Contact Message from ${messageData.name} - Despi's Website`,
@@ -208,13 +202,7 @@ const Contact = () => {
       const { data, error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
         .insert([
-          {
-            name: form.name,
-            email: form.email,
-            message: form.message,
-            is_read: false,
-            created_at: new Date()
-          }
+          { name: form.name, email: form.email, message: form.message, is_read: false, created_at: new Date() }
         ])
         .select();
 
@@ -243,7 +231,6 @@ const Contact = () => {
       setTimeout(() => {
         setSubmitSuccess(false);
       }, 5000);
-
     } catch (error) {
       console.error('Error submitting form:', error);
       setErrorMessage('There was a problem submitting your message. Please try again. Error: ' + (error.message || error));
@@ -279,7 +266,6 @@ const Contact = () => {
             <h3 className="text-2xl font-bold text-gray-900 mb-6">
               Contact Information
             </h3>
-
             {contactInfo.map((info, index) => (
               <motion.div
                 key={info.label}

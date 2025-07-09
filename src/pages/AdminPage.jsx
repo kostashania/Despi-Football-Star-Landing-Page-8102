@@ -8,11 +8,7 @@ import ImageUploader from '../components/ImageUploader';
 import { isAuthenticated, logout } from '../utils/auth';
 import { validateImageUrl } from '../utils/imageUpload';
 
-const { 
-  FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, 
-  FiSettings, FiImage, FiArrowUp, FiArrowDown, FiUpload, FiExternalLink, FiLink,
-  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar, FiCalendar, FiShare2, FiRefreshCw, FiAlertTriangle, FiBell
-} = FiIcons;
+const { FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, FiSettings, FiImage, FiArrowUp, FiArrowDown, FiUpload, FiExternalLink, FiLink, FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar, FiCalendar, FiShare2, FiRefreshCw, FiAlertTriangle, FiBell } = FiIcons;
 
 const AdminPage = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -44,23 +40,9 @@ const AdminPage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [debugInfo, setDebugInfo] = useState('');
   const [emailTestResult, setEmailTestResult] = useState('');
-  const [currentVideo, setCurrentVideo] = useState({
-    title: '',
-    description: '',
-    url: '',
-    thumbnail_url: ''
-  });
-  const [currentImage, setCurrentImage] = useState({
-    title: '',
-    alt_text: '',
-    image_url: '',
-    is_featured: false
-  });
-  const [currentBioItem, setCurrentBioItem] = useState({
-    year: new Date().getFullYear(),
-    description: '',
-    sort_order: 0
-  });
+  const [currentVideo, setCurrentVideo] = useState({ title: '', description: '', url: '', thumbnail_url: '' });
+  const [currentImage, setCurrentImage] = useState({ title: '', alt_text: '', image_url: '', is_featured: false });
+  const [currentBioItem, setCurrentBioItem] = useState({ year: new Date().getFullYear(), description: '', sort_order: 0 });
 
   const tabs = [
     { id: 'messages', label: 'Messages', icon: FiMessageSquare },
@@ -93,12 +75,10 @@ const AdminPage = () => {
 
   const fetchData = async () => {
     setIsLoading(true);
-    
     try {
       if (activeTab === 'messages') {
         try {
           setDebugInfo('Fetching messages...');
-          
           // Use a simpler query to check if table exists and get messages
           const { data, error } = await supabase
             .from('contact_messages_despi_9a7b3c4d2e')
@@ -201,7 +181,6 @@ const AdminPage = () => {
             .select('*');
 
           if (error && error.code !== 'PGRST116') throw error;
-
           const settingsObj = {};
           (data || []).forEach(setting => {
             settingsObj[setting.setting_key] = setting.setting_value;
@@ -232,10 +211,9 @@ const AdminPage = () => {
 
   const testEmailFunction = async () => {
     setEmailTestResult('Testing email function...');
-    
     try {
-      // First try the Supabase Edge Function
-      const { data, error } = await supabase.functions.invoke('send-email', {
+      // First try the Supabase Edge Function with the updated name
+      const { data, error } = await supabase.functions.invoke('resend-email', {
         body: {
           to: settings.notification_emails.split(',')[0].trim(),
           subject: 'Test Email from Despi\'s Website',
@@ -259,17 +237,15 @@ const AdminPage = () => {
       if (error) {
         throw error;
       }
-
-      setEmailTestResult('✅ Test email sent successfully via Supabase Edge Function!');
       
+      setEmailTestResult('✅ Test email sent successfully via Supabase Edge Function!');
     } catch (supabaseError) {
       console.error('Supabase Edge Function failed:', supabaseError);
-      setEmailTestResult('❌ Supabase Edge Function failed: ' + supabaseError.message + 
-        '\n\nPossible issues:\n' +
-        '1. Edge Function not deployed: Run `supabase functions deploy send-email`\n' +
-        '2. RESEND_API_KEY not set in Supabase secrets\n' +
-        '3. From email not verified in Resend account\n' +
-        '4. CORS configuration error\n\n' +
+      setEmailTestResult('❌ Supabase Edge Function failed: ' + supabaseError.message + '\n\nPossible issues:\n' + 
+        '1. Edge Function not deployed: Run `supabase functions deploy resend-email`\n' + 
+        '2. RESEND_API_KEY not set in Supabase secrets\n' + 
+        '3. From email not verified in Resend account\n' + 
+        '4. CORS configuration error\n\n' + 
         'The contact form will still save messages to the database, but email notifications won\'t work until this is fixed.');
     }
     
@@ -283,15 +259,10 @@ const AdminPage = () => {
     try {
       const { error } = await supabase
         .from('gallery_images_despi_9a7b3c4d2e')
-        .update({ 
-          is_approved: true, 
-          upload_status: 'approved',
-          updated_at: new Date()
-        })
+        .update({ is_approved: true, upload_status: 'approved', updated_at: new Date() })
         .eq('id', imageId);
 
       if (error) throw error;
-      
       fetchData();
       alert('Image approved successfully!');
     } catch (error) {
@@ -302,7 +273,6 @@ const AdminPage = () => {
 
   const rejectImage = async (imageId) => {
     if (!confirm('Are you sure you want to reject this image? This will permanently delete it.')) return;
-
     try {
       const { error } = await supabase
         .from('gallery_images_despi_9a7b3c4d2e')
@@ -310,7 +280,6 @@ const AdminPage = () => {
         .eq('id', imageId);
 
       if (error) throw error;
-      
       fetchData();
       alert('Image rejected and deleted.');
     } catch (error) {
@@ -351,10 +320,10 @@ const AdminPage = () => {
             .from('admin_settings_despi_9a7b3c4d2e')
             .insert([setting]);
         }
-
+        
         if (result.error) throw result.error;
       }
-
+      
       alert('Settings saved successfully!');
     } catch (error) {
       console.error('Error saving settings:', error);
@@ -364,7 +333,6 @@ const AdminPage = () => {
 
   const deleteGalleryImage = async (imageId) => {
     if (!confirm('Are you sure you want to delete this image?')) return;
-
     try {
       const { error } = await supabase
         .from('gallery_images_despi_9a7b3c4d2e')
@@ -372,7 +340,6 @@ const AdminPage = () => {
         .eq('id', imageId);
 
       if (error) throw error;
-      
       fetchData();
       alert('Image deleted successfully!');
     } catch (error) {
@@ -389,7 +356,6 @@ const AdminPage = () => {
         .eq('id', imageId);
 
       if (error) throw error;
-      
       fetchData();
     } catch (error) {
       console.error('Error updating image:', error);
@@ -402,28 +368,22 @@ const AdminPage = () => {
       alert('Please fill in title and URL');
       return;
     }
-
+    
     try {
       const extractYoutubeId = (url) => {
         const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
         const match = url.match(regExp);
         return (match && match[2].length === 11) ? match[2] : null;
       };
-
+      
       const youtubeId = extractYoutubeId(currentVideo.url);
       const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : '';
-
+      
       const { error } = await supabase
         .from('videos_despi_9a7b3c4d2e')
-        .insert([{
-          ...currentVideo,
-          youtube_id: youtubeId,
-          thumbnail_url: thumbnailUrl,
-          created_at: new Date()
-        }]);
-
+        .insert([{...currentVideo, youtube_id: youtubeId, thumbnail_url: thumbnailUrl, created_at: new Date()}]);
+        
       if (error) throw error;
-      
       setCurrentVideo({ title: '', description: '', url: '', thumbnail_url: '' });
       fetchData();
       alert('Video added successfully!');
@@ -435,7 +395,6 @@ const AdminPage = () => {
 
   const deleteVideo = async (videoId) => {
     if (!confirm('Are you sure you want to delete this video?')) return;
-
     try {
       const { error } = await supabase
         .from('videos_despi_9a7b3c4d2e')
@@ -443,7 +402,6 @@ const AdminPage = () => {
         .eq('id', videoId);
 
       if (error) throw error;
-      
       fetchData();
       alert('Video deleted successfully!');
     } catch (error) {
@@ -460,7 +418,6 @@ const AdminPage = () => {
         .eq('id', messageId);
 
       if (error) throw error;
-      
       fetchData();
     } catch (error) {
       console.error('Error marking message as read:', error);
@@ -469,7 +426,6 @@ const AdminPage = () => {
 
   const deleteMessage = async (messageId) => {
     if (!confirm('Are you sure you want to delete this message?')) return;
-
     try {
       const { error } = await supabase
         .from('contact_messages_despi_9a7b3c4d2e')
@@ -477,7 +433,6 @@ const AdminPage = () => {
         .eq('id', messageId);
 
       if (error) throw error;
-      
       fetchData();
       alert('Message deleted successfully!');
     } catch (error) {
@@ -491,19 +446,13 @@ const AdminPage = () => {
       alert('Please fill in year and description');
       return;
     }
-
+    
     try {
       const { error } = await supabase
         .from('bio_timeline_despi_9a7b3c4d2e')
-        .insert([{
-          ...currentBioItem,
-          is_active: true,
-          created_at: new Date(),
-          updated_at: new Date()
-        }]);
-
+        .insert([{...currentBioItem, is_active: true, created_at: new Date(), updated_at: new Date()}]);
+        
       if (error) throw error;
-      
       setCurrentBioItem({ year: new Date().getFullYear(), description: '', sort_order: 0 });
       fetchData();
       alert('Bio item added successfully!');
@@ -515,7 +464,6 @@ const AdminPage = () => {
 
   const deleteBioItem = async (itemId) => {
     if (!confirm('Are you sure you want to delete this bio item?')) return;
-
     try {
       const { error } = await supabase
         .from('bio_timeline_despi_9a7b3c4d2e')
@@ -523,7 +471,6 @@ const AdminPage = () => {
         .eq('id', itemId);
 
       if (error) throw error;
-      
       fetchData();
       alert('Bio item deleted successfully!');
     } catch (error) {
@@ -540,7 +487,6 @@ const AdminPage = () => {
         .eq('id', itemId);
 
       if (error) throw error;
-      
       fetchData();
     } catch (error) {
       console.error('Error updating bio item:', error);
@@ -551,7 +497,6 @@ const AdminPage = () => {
   const createSampleMessage = async () => {
     try {
       setDebugInfo('Creating sample message...');
-      
       // Add a sample message
       const sampleMessage = {
         name: 'Test User',
@@ -582,17 +527,15 @@ const AdminPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Contact Messages</h3>
-        
         <div className="flex gap-2">
-          <button
+          <button 
             onClick={() => fetchData()}
             className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 flex items-center gap-1"
           >
             <SafeIcon icon={FiRefreshCw} className="w-4 h-4" />
             Refresh
           </button>
-          
-          <button
+          <button 
             onClick={createSampleMessage}
             className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
           >
@@ -601,7 +544,7 @@ const AdminPage = () => {
           </button>
         </div>
       </div>
-      
+
       {debugInfo && (
         <div className="bg-gray-100 p-4 rounded-lg text-xs font-mono whitespace-pre-wrap overflow-auto max-h-40 mb-4">
           <div className="flex justify-between">
@@ -613,7 +556,7 @@ const AdminPage = () => {
           {debugInfo}
         </div>
       )}
-      
+
       {isLoading ? (
         <div className="flex items-center justify-center h-40">
           <SafeIcon icon={FiRefreshCw} className="w-6 h-6 text-blue-500 animate-spin" />
@@ -630,10 +573,8 @@ const AdminPage = () => {
                 <div>
                   <h4 className="font-semibold text-lg mb-2">No Messages Found</h4>
                   <p className="mb-4">
-                    No messages have been submitted through the contact form yet. 
-                    You can add a sample message for testing purposes.
+                    No messages have been submitted through the contact form yet. You can add a sample message for testing purposes.
                   </p>
-                  
                   <div className="bg-white p-4 rounded-lg border border-blue-100 mb-4">
                     <h5 className="font-medium mb-2">Troubleshooting</h5>
                     <ul className="list-disc list-inside text-sm space-y-1">
@@ -643,7 +584,6 @@ const AdminPage = () => {
                       <li>Ensure the form is properly connected to the database</li>
                     </ul>
                   </div>
-                  
                   <button 
                     onClick={createSampleMessage}
                     className="bg-blue-100 hover:bg-blue-200 px-4 py-2 rounded-md text-blue-800 transition-colors flex items-center gap-2"
@@ -656,9 +596,10 @@ const AdminPage = () => {
             </div>
           ) : (
             messages.map((message) => (
-              <div key={message.id} className={`bg-white p-4 rounded-lg shadow ${
-                !message.is_read ? 'border-l-4 border-blue-400' : ''
-              }`}>
+              <div 
+                key={message.id} 
+                className={`bg-white p-4 rounded-lg shadow ${!message.is_read ? 'border-l-4 border-blue-400' : ''}`}
+              >
                 <div className="flex justify-between items-start mb-3">
                   <div>
                     <h4 className="font-medium">{message.name}</h4>
@@ -677,7 +618,7 @@ const AdminPage = () => {
                 </div>
                 <p className="text-gray-700 mb-3">{message.message}</p>
                 <div className="flex gap-2">
-                  <a
+                  <a 
                     href={`mailto:${message.email}`}
                     className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 flex items-center gap-1"
                   >
@@ -685,14 +626,14 @@ const AdminPage = () => {
                     Reply
                   </a>
                   {!message.is_read && (
-                    <button
+                    <button 
                       onClick={() => markMessageAsRead(message.id)}
                       className="px-3 py-1 bg-blue-600 text-white text-xs rounded hover:bg-blue-700"
                     >
                       Mark as Read
                     </button>
                   )}
-                  <button
+                  <button 
                     onClick={() => deleteMessage(message.id)}
                     className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
                   >
@@ -710,7 +651,6 @@ const AdminPage = () => {
   const renderPendingTab = () => (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold">Pending Image Approvals</h3>
-      
       {isLoading ? (
         <p>Loading pending images...</p>
       ) : (
@@ -726,9 +666,7 @@ const AdminPage = () => {
                       src={image.image_url}
                       alt={image.alt_text}
                       className="w-full h-24 object-cover rounded"
-                      onError={(e) => {
-                        e.target.src = 'https://via.placeholder.com/160x96?text=Image';
-                      }}
+                      onError={(e) => {e.target.src='https://via.placeholder.com/160x96?text=Image';}}
                     />
                   </div>
                   <div className="flex-grow">
@@ -747,21 +685,21 @@ const AdminPage = () => {
                     </div>
                   </div>
                   <div className="flex-shrink-0 flex flex-col gap-2">
-                    <button
+                    <button 
                       onClick={() => approveImage(image.id)}
                       className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
                     >
                       <SafeIcon icon={FiCheck} className="w-4 h-4" />
                       Approve
                     </button>
-                    <button
+                    <button 
                       onClick={() => rejectImage(image.id)}
                       className="px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 flex items-center gap-1"
                     >
                       <SafeIcon icon={FiX} className="w-4 h-4" />
                       Reject
                     </button>
-                    <a
+                    <a 
                       href={image.image_url}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -784,7 +722,7 @@ const AdminPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Bio Timeline Management</h3>
-        <button
+        <button 
           onClick={() => setIsEditing(!isEditing)}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
         >
@@ -801,7 +739,7 @@ const AdminPage = () => {
               <input
                 type="number"
                 value={currentBioItem.year}
-                onChange={(e) => setCurrentBioItem({ ...currentBioItem, year: parseInt(e.target.value) })}
+                onChange={(e) => setCurrentBioItem({...currentBioItem, year: parseInt(e.target.value)})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="2024"
                 min="1900"
@@ -812,7 +750,7 @@ const AdminPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={currentBioItem.description}
-                onChange={(e) => setCurrentBioItem({ ...currentBioItem, description: e.target.value })}
+                onChange={(e) => setCurrentBioItem({...currentBioItem, description: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 rows="3"
                 placeholder="Despi joins K10 of Finikas Italian Academy"
@@ -823,20 +761,20 @@ const AdminPage = () => {
               <input
                 type="number"
                 value={currentBioItem.sort_order}
-                onChange={(e) => setCurrentBioItem({ ...currentBioItem, sort_order: parseInt(e.target.value) })}
+                onChange={(e) => setCurrentBioItem({...currentBioItem, sort_order: parseInt(e.target.value)})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="0"
                 min="0"
               />
             </div>
             <div className="flex gap-3">
-              <button
+              <button 
                 onClick={addBioItem}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
                 Add Bio Item
               </button>
-              <button
+              <button 
                 onClick={() => setIsEditing(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               >
@@ -860,9 +798,7 @@ const AdminPage = () => {
             </div>
           ) : (
             bioTimeline.map((item) => (
-              <div key={item.id} className={`bg-white p-4 rounded-lg shadow ${
-                !item.is_active ? 'opacity-50' : ''
-              }`}>
+              <div key={item.id} className={`bg-white p-4 rounded-lg shadow ${!item.is_active ? 'opacity-50' : ''}`}>
                 <div className="flex justify-between items-start">
                   <div className="flex-grow">
                     <div className="flex items-center gap-2 mb-2">
@@ -881,17 +817,13 @@ const AdminPage = () => {
                     </div>
                   </div>
                   <div className="flex-shrink-0 flex gap-2">
-                    <button
+                    <button 
                       onClick={() => toggleBioItemActive(item.id, item.is_active)}
-                      className={`px-3 py-1 text-xs rounded ${
-                        item.is_active 
-                          ? 'bg-yellow-100 text-yellow-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}
+                      className={`px-3 py-1 text-xs rounded ${item.is_active ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'}`}
                     >
                       {item.is_active ? 'Hide' : 'Show'}
                     </button>
-                    <button
+                    <button 
                       onClick={() => deleteBioItem(item.id)}
                       className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
                     >
@@ -910,7 +842,6 @@ const AdminPage = () => {
   const renderGalleryTab = () => (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold">Gallery Management</h3>
-      
       {isLoading ? (
         <p>Loading gallery images...</p>
       ) : (
@@ -927,9 +858,7 @@ const AdminPage = () => {
                     src={image.image_url}
                     alt={image.alt_text}
                     className="w-full h-32 object-cover rounded"
-                    onError={(e) => {
-                      e.target.src = 'https://via.placeholder.com/200x128?text=Image';
-                    }}
+                    onError={(e) => {e.target.src='https://via.placeholder.com/200x128?text=Image';}}
                   />
                   {image.is_featured && (
                     <span className="absolute top-2 right-2 bg-yellow-500 text-white text-xs px-2 py-1 rounded-full">
@@ -941,17 +870,13 @@ const AdminPage = () => {
                 <h4 className="font-medium mb-2">{image.title}</h4>
                 <p className="text-sm text-gray-600 mb-3">{image.alt_text}</p>
                 <div className="flex gap-2">
-                  <button
+                  <button 
                     onClick={() => toggleImageFeatured(image.id, image.is_featured)}
-                    className={`px-3 py-1 text-xs rounded ${
-                      image.is_featured 
-                        ? 'bg-yellow-100 text-yellow-800' 
-                        : 'bg-gray-100 text-gray-600'
-                    }`}
+                    className={`px-3 py-1 text-xs rounded ${image.is_featured ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-600'}`}
                   >
                     {image.is_featured ? 'Unfeature' : 'Feature'}
                   </button>
-                  <button
+                  <button 
                     onClick={() => deleteGalleryImage(image.id)}
                     className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
                   >
@@ -970,7 +895,7 @@ const AdminPage = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h3 className="text-xl font-semibold">Video Management</h3>
-        <button
+        <button 
           onClick={() => setIsEditing(!isEditing)}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
         >
@@ -987,7 +912,7 @@ const AdminPage = () => {
               <input
                 type="text"
                 value={currentVideo.title}
-                onChange={(e) => setCurrentVideo({ ...currentVideo, title: e.target.value })}
+                onChange={(e) => setCurrentVideo({...currentVideo, title: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="Enter video title"
               />
@@ -996,7 +921,7 @@ const AdminPage = () => {
               <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
               <textarea
                 value={currentVideo.description}
-                onChange={(e) => setCurrentVideo({ ...currentVideo, description: e.target.value })}
+                onChange={(e) => setCurrentVideo({...currentVideo, description: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 rows="3"
                 placeholder="Enter video description"
@@ -1007,19 +932,19 @@ const AdminPage = () => {
               <input
                 type="url"
                 value={currentVideo.url}
-                onChange={(e) => setCurrentVideo({ ...currentVideo, url: e.target.value })}
+                onChange={(e) => setCurrentVideo({...currentVideo, url: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 placeholder="https://www.youtube.com/watch?v=..."
               />
             </div>
             <div className="flex gap-3">
-              <button
+              <button 
                 onClick={addVideo}
                 className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700"
               >
                 Add Video
               </button>
-              <button
+              <button 
                 onClick={() => setIsEditing(false)}
                 className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-50"
               >
@@ -1054,7 +979,7 @@ const AdminPage = () => {
                 <h4 className="font-medium mb-2">{video.title}</h4>
                 <p className="text-sm text-gray-600 mb-3">{video.description}</p>
                 <div className="flex gap-2">
-                  <a
+                  <a 
                     href={video.url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1063,7 +988,7 @@ const AdminPage = () => {
                     <SafeIcon icon={FiExternalLink} className="w-3 h-3" />
                     View
                   </a>
-                  <button
+                  <button 
                     onClick={() => deleteVideo(video.id)}
                     className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
                   >
@@ -1081,7 +1006,7 @@ const AdminPage = () => {
   const renderSettingsTab = () => (
     <div className="space-y-6">
       <h3 className="text-xl font-semibold">Website Settings</h3>
-      
+
       <div className="bg-white p-6 rounded-lg shadow">
         <h4 className="text-lg font-medium mb-4">Email Notifications</h4>
         <div className="space-y-4">
@@ -1090,14 +1015,14 @@ const AdminPage = () => {
               type="checkbox"
               id="email_notifications_enabled"
               checked={settings.email_notifications_enabled}
-              onChange={(e) => setSettings({ ...settings, email_notifications_enabled: e.target.checked })}
+              onChange={(e) => setSettings({...settings, email_notifications_enabled: e.target.checked})}
               className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
             />
             <label htmlFor="email_notifications_enabled" className="text-sm font-medium text-gray-700">
               Enable email notifications for new contact messages
             </label>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Notification Email Addresses
@@ -1105,7 +1030,7 @@ const AdminPage = () => {
             <input
               type="text"
               value={settings.notification_emails}
-              onChange={(e) => setSettings({ ...settings, notification_emails: e.target.value })}
+              onChange={(e) => setSettings({...settings, notification_emails: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="email1@example.com, email2@example.com"
             />
@@ -1113,7 +1038,7 @@ const AdminPage = () => {
               Separate multiple email addresses with commas. These emails will receive notifications for new messages.
             </p>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               From Email Address
@@ -1121,7 +1046,7 @@ const AdminPage = () => {
             <input
               type="email"
               value={settings.email_from_address}
-              onChange={(e) => setSettings({ ...settings, email_from_address: e.target.value })}
+              onChange={(e) => setSettings({...settings, email_from_address: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="noreply@asvesta.eu"
             />
@@ -1129,9 +1054,9 @@ const AdminPage = () => {
               This email address must be verified in your Resend account
             </p>
           </div>
-          
+
           <div className="pt-4 border-t">
-            <button
+            <button 
               onClick={testEmailFunction}
               className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
             >
@@ -1141,7 +1066,6 @@ const AdminPage = () => {
             <p className="text-xs text-gray-500 mt-2">
               Send a test email to verify your email configuration is working
             </p>
-            
             {emailTestResult && (
               <div className="mt-4 p-3 bg-gray-50 rounded-md">
                 <h5 className="font-medium mb-2">Test Results:</h5>
@@ -1151,7 +1075,7 @@ const AdminPage = () => {
           </div>
         </div>
       </div>
-      
+
       <div className="bg-white p-6 rounded-lg shadow">
         <h4 className="text-lg font-medium mb-4">Social Media URLs</h4>
         <div className="space-y-4">
@@ -1162,12 +1086,11 @@ const AdminPage = () => {
             <input
               type="url"
               value={settings.social_youtube_url}
-              onChange={(e) => setSettings({ ...settings, social_youtube_url: e.target.value })}
+              onChange={(e) => setSettings({...settings, social_youtube_url: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://www.youtube.com/@despi5740"
             />
           </div>
-          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Instagram URL
@@ -1175,12 +1098,11 @@ const AdminPage = () => {
             <input
               type="url"
               value={settings.social_instagram_url}
-              onChange={(e) => setSettings({ ...settings, social_instagram_url: e.target.value })}
+              onChange={(e) => setSettings({...settings, social_instagram_url: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://instagram.com/despi_football"
             />
           </div>
-          
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Facebook URL
@@ -1188,7 +1110,7 @@ const AdminPage = () => {
             <input
               type="url"
               value={settings.social_facebook_url}
-              onChange={(e) => setSettings({ ...settings, social_facebook_url: e.target.value })}
+              onChange={(e) => setSettings({...settings, social_facebook_url: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="https://facebook.com/despi.football"
             />
@@ -1204,14 +1126,14 @@ const AdminPage = () => {
               type="checkbox"
               id="recaptcha_enabled"
               checked={settings.recaptcha_enabled}
-              onChange={(e) => setSettings({ ...settings, recaptcha_enabled: e.target.checked })}
+              onChange={(e) => setSettings({...settings, recaptcha_enabled: e.target.checked})}
               className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
             />
             <label htmlFor="recaptcha_enabled" className="text-sm font-medium text-gray-700">
               Enable reCAPTCHA for contact form and image uploads
             </label>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               reCAPTCHA Site Key
@@ -1219,7 +1141,7 @@ const AdminPage = () => {
             <input
               type="text"
               value={settings.recaptcha_site_key}
-              onChange={(e) => setSettings({ ...settings, recaptcha_site_key: e.target.value })}
+              onChange={(e) => setSettings({...settings, recaptcha_site_key: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="Enter your reCAPTCHA site key"
             />
@@ -1235,7 +1157,7 @@ const AdminPage = () => {
               </a>
             </p>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               reCAPTCHA Secret Key
@@ -1243,7 +1165,7 @@ const AdminPage = () => {
             <input
               type="password"
               value={settings.recaptcha_secret_key}
-              onChange={(e) => setSettings({ ...settings, recaptcha_secret_key: e.target.value })}
+              onChange={(e) => setSettings({...settings, recaptcha_secret_key: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md"
               placeholder="Enter your reCAPTCHA secret key"
               autoComplete="new-password"
@@ -1256,7 +1178,7 @@ const AdminPage = () => {
       </div>
 
       <div className="pt-4">
-        <button
+        <button 
           onClick={saveSettings}
           className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 flex items-center gap-2"
         >
@@ -1277,7 +1199,7 @@ const AdminPage = () => {
             type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             value={heroContent.title}
-            onChange={(e) => setHeroContent({ ...heroContent, title: e.target.value })}
+            onChange={(e) => setHeroContent({...heroContent, title: e.target.value})}
           />
         </div>
         <div>
@@ -1286,7 +1208,7 @@ const AdminPage = () => {
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             rows="4"
             value={heroContent.subtitle}
-            onChange={(e) => setHeroContent({ ...heroContent, subtitle: e.target.value })}
+            onChange={(e) => setHeroContent({...heroContent, subtitle: e.target.value})}
           ></textarea>
         </div>
         <div>
@@ -1295,7 +1217,7 @@ const AdminPage = () => {
             type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             value={heroContent.buttonText}
-            onChange={(e) => setHeroContent({ ...heroContent, buttonText: e.target.value })}
+            onChange={(e) => setHeroContent({...heroContent, buttonText: e.target.value})}
           />
         </div>
         <div>
@@ -1304,42 +1226,34 @@ const AdminPage = () => {
             type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-md"
             value={heroContent.buttonLink}
-            onChange={(e) => setHeroContent({ ...heroContent, buttonLink: e.target.value })}
+            onChange={(e) => setHeroContent({...heroContent, buttonLink: e.target.value})}
           />
         </div>
       </div>
       <div className="pt-4">
-        <button
+        <button 
           onClick={async () => {
             try {
               const { data: existingData, error: checkError } = await supabase
                 .from('hero_content_despi_9a7b3c4d2e')
                 .select('id')
                 .limit(1);
-
+                
               if (checkError && checkError.code !== 'PGRST116') throw checkError;
-
+              
               let result;
               if (existingData && existingData.length > 0) {
                 result = await supabase
                   .from('hero_content_despi_9a7b3c4d2e')
-                  .update({
-                    ...heroContent,
-                    updated_at: new Date()
-                  })
+                  .update({...heroContent, updated_at: new Date()})
                   .eq('id', existingData[0].id);
               } else {
                 result = await supabase
                   .from('hero_content_despi_9a7b3c4d2e')
-                  .insert([{
-                    ...heroContent,
-                    created_at: new Date(),
-                    updated_at: new Date()
-                  }]);
+                  .insert([{...heroContent, created_at: new Date(), updated_at: new Date()}]);
               }
-
-              if (result.error) throw result.error;
               
+              if (result.error) throw result.error;
               alert('Hero content saved successfully!');
             } catch (error) {
               console.error('Error saving hero content:', error);
@@ -1372,9 +1286,7 @@ const AdminPage = () => {
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
                     className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                      activeTab === tab.id
-                        ? 'bg-green-600 text-white'
-                        : 'text-gray-300 hover:bg-gray-700'
+                      activeTab === tab.id ? 'bg-green-600 text-white' : 'text-gray-300 hover:bg-gray-700'
                     }`}
                   >
                     <SafeIcon icon={tab.icon} />
