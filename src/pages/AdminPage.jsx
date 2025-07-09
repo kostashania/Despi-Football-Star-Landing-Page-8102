@@ -11,7 +11,7 @@ import { validateImageUrl } from '../utils/imageUpload';
 const { 
   FiEdit, FiTrash2, FiSave, FiPlus, FiX, FiMessageSquare, FiYoutube, FiLogOut, 
   FiSettings, FiImage, FiArrowUp, FiArrowDown, FiUpload, FiExternalLink, FiLink,
-  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar, FiCalendar, FiShare2, FiRefreshCw, FiAlertTriangle
+  FiCheck, FiClock, FiEye, FiMail, FiVideo, FiStar, FiCalendar, FiShare2, FiRefreshCw, FiAlertTriangle, FiBell
 } = FiIcons;
 
 const AdminPage = () => {
@@ -33,6 +33,8 @@ const AdminPage = () => {
     recaptcha_site_key: '',
     recaptcha_secret_key: '',
     notification_emails: 'despihania@gmail.com',
+    email_notifications_enabled: true,
+    email_from_address: 'noreply@asvesta.eu',
     social_youtube_url: 'https://www.youtube.com/@despi5740',
     social_instagram_url: 'https://instagram.com/despi_football',
     social_facebook_url: 'https://facebook.com/despi.football'
@@ -345,6 +347,8 @@ const AdminPage = () => {
           recaptcha_site_key: settingsObj.recaptcha_site_key || '',
           recaptcha_secret_key: settingsObj.recaptcha_secret_key || '',
           notification_emails: settingsObj.notification_emails || 'despihania@gmail.com',
+          email_notifications_enabled: settingsObj.email_notifications_enabled !== 'false',
+          email_from_address: settingsObj.email_from_address || 'noreply@asvesta.eu',
           social_youtube_url: settingsObj.social_youtube_url || 'https://www.youtube.com/@despi5740',
           social_instagram_url: settingsObj.social_instagram_url || 'https://instagram.com/despi_football',
           social_facebook_url: settingsObj.social_facebook_url || 'https://facebook.com/despi.football'
@@ -355,6 +359,40 @@ const AdminPage = () => {
       setDebugInfo(prevInfo => prevInfo + `\nError fetching ${activeTab} data: ` + JSON.stringify(error));
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const testEmailFunction = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
+          to: settings.notification_emails.split(',')[0].trim(),
+          subject: 'Test Email from Despi\'s Website',
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <div style="background: linear-gradient(135deg, #16a34a, #22c55e); color: white; padding: 20px; border-radius: 10px;">
+                <h1 style="margin: 0;">Test Email</h1>
+                <p style="margin: 10px 0 0 0;">This is a test email from Despi's website admin panel.</p>
+              </div>
+              <div style="padding: 20px; background: #f8f9fa; border-radius: 0 0 10px 10px;">
+                <p>If you received this email, your email notifications are working correctly!</p>
+                <p style="color: #6b7280; font-size: 14px; margin-top: 20px;">
+                  Sent at: ${new Date().toLocaleString()}
+                </p>
+              </div>
+            </div>
+          `
+        }
+      });
+
+      if (error) {
+        alert('Error sending test email: ' + error.message);
+      } else {
+        alert('Test email sent successfully!');
+      }
+    } catch (error) {
+      console.error('Error testing email function:', error);
+      alert('Error testing email function: ' + error.message);
     }
   };
 
@@ -405,6 +443,8 @@ const AdminPage = () => {
         { setting_key: 'recaptcha_site_key', setting_value: settings.recaptcha_site_key },
         { setting_key: 'recaptcha_secret_key', setting_value: settings.recaptcha_secret_key },
         { setting_key: 'notification_emails', setting_value: settings.notification_emails },
+        { setting_key: 'email_notifications_enabled', setting_value: settings.email_notifications_enabled.toString() },
+        { setting_key: 'email_from_address', setting_value: settings.email_from_address },
         { setting_key: 'social_youtube_url', setting_value: settings.social_youtube_url },
         { setting_key: 'social_instagram_url', setting_value: settings.social_instagram_url },
         { setting_key: 'social_facebook_url', setting_value: settings.social_facebook_url }
@@ -1258,6 +1298,69 @@ const AdminPage = () => {
       <h3 className="text-xl font-semibold">Website Settings</h3>
       
       <div className="bg-white p-6 rounded-lg shadow">
+        <h4 className="text-lg font-medium mb-4">Email Notifications</h4>
+        <div className="space-y-4">
+          <div className="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id="email_notifications_enabled"
+              checked={settings.email_notifications_enabled}
+              onChange={(e) => setSettings({ ...settings, email_notifications_enabled: e.target.checked })}
+              className="w-4 h-4 text-green-600 rounded focus:ring-green-500"
+            />
+            <label htmlFor="email_notifications_enabled" className="text-sm font-medium text-gray-700">
+              Enable email notifications for new contact messages
+            </label>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Notification Email Addresses
+            </label>
+            <input
+              type="text"
+              value={settings.notification_emails}
+              onChange={(e) => setSettings({ ...settings, notification_emails: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="email1@example.com, email2@example.com"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              Separate multiple email addresses with commas. These emails will receive notifications for new messages.
+            </p>
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              From Email Address
+            </label>
+            <input
+              type="email"
+              value={settings.email_from_address}
+              onChange={(e) => setSettings({ ...settings, email_from_address: e.target.value })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="noreply@asvesta.eu"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+              This email address must be verified in your Resend account
+            </p>
+          </div>
+          
+          <div className="pt-4 border-t">
+            <button
+              onClick={testEmailFunction}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+            >
+              <SafeIcon icon={FiBell} className="w-4 h-4" />
+              Test Email Function
+            </button>
+            <p className="text-xs text-gray-500 mt-2">
+              Send a test email to verify your email configuration is working
+            </p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="bg-white p-6 rounded-lg shadow">
         <h4 className="text-lg font-medium mb-4">Social Media URLs</h4>
         <div className="space-y-4">
           <div>
@@ -1355,27 +1458,6 @@ const AdminPage = () => {
             />
             <p className="text-xs text-gray-500 mt-1">
               This is used for server-side verification
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h4 className="text-lg font-medium mb-4">Email Notifications</h4>
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notification Email Addresses
-            </label>
-            <input
-              type="text"
-              value={settings.notification_emails}
-              onChange={(e) => setSettings({ ...settings, notification_emails: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              placeholder="email1@example.com, email2@example.com"
-            />
-            <p className="text-xs text-gray-500 mt-1">
-              Separate multiple email addresses with commas. These emails will receive notifications for new messages and image uploads.
             </p>
           </div>
         </div>

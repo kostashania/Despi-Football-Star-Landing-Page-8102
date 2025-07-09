@@ -140,6 +140,117 @@ const Contact = () => {
     setRecaptchaValue(value);
   };
 
+  const sendEmailNotification = async (messageData) => {
+    try {
+      // Get notification settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('admin_settings_despi_9a7b3c4d2e')
+        .select('*')
+        .in('setting_key', ['notification_emails', 'email_notifications_enabled']);
+
+      if (settingsError) throw settingsError;
+
+      const settings = {};
+      settingsData.forEach(setting => {
+        settings[setting.setting_key] = setting.setting_value;
+      });
+
+      // Check if email notifications are enabled
+      if (settings.email_notifications_enabled !== 'true') {
+        console.log('Email notifications are disabled');
+        return;
+      }
+
+      const notificationEmails = settings.notification_emails || 'despihania@gmail.com';
+      const emailList = notificationEmails.split(',').map(email => email.trim()).filter(email => email);
+
+      if (emailList.length === 0) {
+        console.log('No notification emails configured');
+        return;
+      }
+
+      // Create HTML email content
+      const htmlContent = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #16a34a, #22c55e); color: white; padding: 20px; border-radius: 10px 10px 0 0;">
+            <h1 style="margin: 0; font-size: 24px;">New Contact Message</h1>
+            <p style="margin: 10px 0 0 0; opacity: 0.9;">Despi's Website</p>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 20px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+              <h2 style="color: #16a34a; margin-top: 0;">Message Details</h2>
+              
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #374151;">Name:</strong>
+                <div style="margin-top: 5px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                  ${messageData.name}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #374151;">Email:</strong>
+                <div style="margin-top: 5px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                  <a href="mailto:${messageData.email}" style="color: #16a34a; text-decoration: none;">
+                    ${messageData.email}
+                  </a>
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #374151;">Message:</strong>
+                <div style="margin-top: 5px; padding: 15px; background: #f3f4f6; border-radius: 5px; line-height: 1.6;">
+                  ${messageData.message.replace(/\n/g, '<br>')}
+                </div>
+              </div>
+              
+              <div style="margin-bottom: 15px;">
+                <strong style="color: #374151;">Received:</strong>
+                <div style="margin-top: 5px; padding: 10px; background: #f3f4f6; border-radius: 5px;">
+                  ${new Date(messageData.created_at).toLocaleString()}
+                </div>
+              </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 20px;">
+              <a href="${window.location.origin}/#/admin" 
+                 style="background: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                View in Admin Panel
+              </a>
+            </div>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef; text-align: center; color: #6b7280; font-size: 14px;">
+              <p>This email was sent automatically from Despi's website contact form.</p>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Send email to each recipient
+      for (const email of emailList) {
+        try {
+          const { data, error } = await supabase.functions.invoke('send-email', {
+            body: {
+              to: email,
+              subject: `New Contact Message from ${messageData.name} - Despi's Website`,
+              html: htmlContent
+            }
+          });
+
+          if (error) {
+            console.error('Error sending email to', email, ':', error);
+          } else {
+            console.log('Email sent successfully to', email);
+          }
+        } catch (emailError) {
+          console.error('Error sending email to', email, ':', emailError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in sendEmailNotification:', error);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -163,7 +274,8 @@ const Contact = () => {
             name: form.name,
             email: form.email,
             message: form.message,
-            is_read: false
+            is_read: false,
+            created_at: new Date()
           }
         ])
         .select();
@@ -174,6 +286,12 @@ const Contact = () => {
       }
 
       console.log("Message submitted successfully:", data);
+
+      // Send email notification
+      if (data && data.length > 0) {
+        await sendEmailNotification(data[0]);
+      }
+
       setSubmitSuccess(true);
       setForm({ name: '', email: '', message: '' });
 
@@ -187,10 +305,6 @@ const Contact = () => {
       setTimeout(() => {
         setSubmitSuccess(false);
       }, 5000);
-      
-      // Send notification email (This is just for display - it won't actually work in the browser environment)
-      // In a production environment, you would use a serverless function or backend service
-      console.log("Would send notification email to admin");
       
     } catch (error) {
       console.error('Error submitting form:', error);
